@@ -1,0 +1,5 @@
+.cache
+.eslintcache
+node_modules
+dist
+data

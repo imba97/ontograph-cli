@@ -1,0 +1,65 @@
+{
+  "name": "ontology",
+  "type": "module",
+  "version": "0.0.0",
+  "packageManager": "pnpm@11.4.0",
+  "description": "Entity-relationship knowledge graph CLI — add entities, relate them, and query the graph",
+  "author": "imba97",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:imba97/ontology.git"
+  },
+  "keywords": [
+    "ontology",
+    "knowledge-graph",
+    "entity",
+    "relationship",
+    "cli"
+  ],
+  "main": "dist/index.mjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "ontology": "./bin/ontology.mjs"
+  },
+  "files": [
+    "SKILL.md",
+    "bin",
+    "dist"
+  ],
+  "scripts": {
+    "stub": "unbuild --stub",
+    "build": "unbuild",
+    "release": "bumpp",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint --cache",
+    "prepare": "simple-git-hooks",
+    "ontology": "node bin/ontology.mjs"
+  },
+  "dependencies": {
+    "cac": "^7.0.0",
+    "consola": "^3.4.2",
+    "glob": "^13.0.6",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^9.0.0",
+    "@types/node": "^25.9.1",
+    "bumpp": "^11.1.0",
+    "eslint": "^10.4.0",
+    "nano-staged": "^1.0.2",
+    "simple-git-hooks": "^2.13.1",
+    "typescript": "^6.0.3",
+    "unbuild": "^3.6.1",
+    "vitest": "^4.1.7"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm nano-staged"
+  },
+  "nano-staged": {
+    "*": "eslint --cache --fix"
+  }
+}
