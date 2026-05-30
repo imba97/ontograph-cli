@@ -1,7 +1,7 @@
 {
   "name": "ontology",
   "type": "module",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "packageManager": "pnpm@11.4.0",
   "description": "Entity-relationship knowledge graph CLI — add entities, relate them, and query the graph",
   "author": "imba97",
