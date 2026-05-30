@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Migrate ontology data from single-file (entities.json) to split files
+ * Migrate ontograph data from single-file (entities.json) to split files
  * (entities/{type}/{id}.json + relations.json).
  *
  * Usage:

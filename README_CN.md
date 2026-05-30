@@ -1,4 +1,4 @@
-# ontology
+# ontograph-cli
 
 > 实体关系知识图谱 CLI 工具
 
@@ -7,26 +7,26 @@
 ## 安装
 
 ```bash
-pnpm add -g ontology
+pnpm add -g ontograph-cli
 ```
 
 ## 快速上手
 
 ```bash
 # 添加实体
-ontology add person imba97 --name "imba久期" --prop timezone=+8
-ontology add project website --name "网站重构" --prop status=active
+ontograph add person imba97 --name "imba久期" --prop timezone=+8
+ontograph add project website --name "网站重构" --prop status=active
 
 # 建立关系
-ontology relate person:imba97 owns project:website
+ontograph relate person:imba97 owns project:website
 
 # 查询
-ontology related person:imba97
-ontology search 久期
+ontograph related person:imba97
+ontograph search 久期
 
 # 列表
-ontology list
-ontology types
+ontograph list
+ontograph types
 ```
 
 ## 命令参考
@@ -36,7 +36,7 @@ ontology types
 添加实体。
 
 ```bash
-ontology add <type> <id> --name <名称> [--prop key=value ...]
+ontograph add <type> <id> --name <名称> [--prop key=value ...]
 ```
 
 ### `relate <from> <rel> <to>`
@@ -44,7 +44,7 @@ ontology add <type> <id> --name <名称> [--prop key=value ...]
 建立实体间关系。
 
 ```bash
-ontology relate <from> <rel> <to>
+ontograph relate <from> <rel> <to>
 ```
 
 ### `unrelate <from> <rel> <to>`
@@ -52,7 +52,7 @@ ontology relate <from> <rel> <to>
 取消关系。
 
 ```bash
-ontology unrelate <from> <rel> <to>
+ontograph unrelate <from> <rel> <to>
 ```
 
 ### `related <id>`
@@ -60,7 +60,7 @@ ontology unrelate <from> <rel> <to>
 查询关联实体。
 
 ```bash
-ontology related <id> [--rel <关系类型>]
+ontograph related <id> [--rel <关系类型>]
 ```
 
 ### `search <query>`
@@ -68,7 +68,7 @@ ontology related <id> [--rel <关系类型>]
 按名称或 ID 搜索实体。
 
 ```bash
-ontology search <关键词>
+ontograph search <关键词>
 ```
 
 ### `list [type]`
@@ -76,7 +76,7 @@ ontology search <关键词>
 列出实体，可按类型过滤。
 
 ```bash
-ontology list [type]
+ontograph list [type]
 ```
 
 ### `types`
@@ -84,7 +84,7 @@ ontology list [type]
 列出所有实体类型。
 
 ```bash
-ontology types
+ontograph types
 ```
 
 ## 概念
@@ -109,16 +109,16 @@ project:website --has_task--> task:design
 
 ## 数据存储
 
-数据默认存储在 `~/.hermes/data/ontology/entities.json`，可通过 `--data-dir` 指定其他路径。
+数据默认存储在 `~/.hermes/data/ontograph-cli/entities.json`，可通过 `--data-dir` 指定其他路径。
 
 ## Hermes Agent 集成
 
 本工具附带 `SKILL.md`，Hermes Agent 可直接识别并通过 `terminal` 调用：
 
 ```bash
-ontology search <关键词>
-ontology related <id>
-ontology list
+ontograph search <关键词>
+ontograph related <id>
+ontograph list
 ```
 
 ## License

@@ -1,18 +1,18 @@
 ---
-name: ontology
+name: ontograph-cli
 description: Entity-relationship knowledge graph CLI — add entities, relate them, and query the graph. Useful for tracking people, projects, tasks and their relationships.
 version: 0.2.0
 platforms: [linux, macos]
 metadata:
   hermes:
-    tags: [ontology, knowledge-graph, entity, relationship, cli]
+    tags: [ontograph-cli, knowledge-graph, entity, relationship, cli]
 ---
 
-# Ontology — Entity-Relationship Graph
+# Ontograph CLI — Entity-Relationship Graph
 
 ## Overview
 
-`ontology` is a CLI tool for managing entities and their relations, with schema validation and graph queries.
+`ontograph` is a CLI tool for managing entities and their relations, with schema validation and graph queries.
 
 ## Core Concepts
 
@@ -45,75 +45,75 @@ metadata:
 ### Add Entity
 
 ```bash
-ontology add <type> <id> --name <name> [--prop key=value ...]
+ontograph add <type> <id> --name <name> [--prop key=value ...]
 ```
 
 ### Remove Entity
 
 ```bash
-ontology remove <id>
+ontograph remove <id>
 ```
 
 ### Relate / Unrelate
 
 ```bash
-ontology relate <from> <rel> <to>
-ontology unrelate <from> <rel> <to>
+ontograph relate <from> <rel> <to>
+ontograph unrelate <from> <rel> <to>
 ```
 
 ### List & Search
 
 ```bash
-ontology list [type]
-ontology search <query> [--type <type>]
-ontology types
-ontology relations
+ontograph list [type]
+ontograph search <query> [--type <type>]
+ontograph types
+ontograph relations
 ```
 
 ### Query Relations
 
 ```bash
-ontology related <id> [--rel <relation>]
+ontograph related <id> [--rel <relation>]
 ```
 
 ### Advanced Queries
 
 ```bash
 # Aggregate counts by field
-ontology aggregate [--field <field>] [--type <type>]
+ontograph aggregate [--field <field>] [--type <type>]
 
 # Find shortest path (BFS)
-ontology path <from> <to> [--depth <n>]
+ontograph path <from> <to> [--depth <n>]
 
 # Filter by type, status, tags
-ontology query [--type <type>] [--status <status>] [--tag <tag>...]
+ontograph query [--type <type>] [--status <status>] [--tag <tag>...]
 
 # Data info
-ontology info
+ontograph info
 ```
 
 ## Data Storage
 
-`~/.hermes/data/ontology/entities.json`
+`~/.hermes/data/ontograph-cli/entities.json`
 
 ## Hermes Agent Usage
 
 ```bash
 # Search
-ontology search <keyword>
+ontograph search <keyword>
 
 # Find relations
-ontology related <id>
+ontograph related <id>
 
 # List all
-ontology list
+ontograph list
 
 # Info
-ontology info
+ontograph info
 ```
 
 ## Installation
 
 ```bash
-pnpm add -g ontology
+pnpm add -g ontograph-cli
 ```

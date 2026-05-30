@@ -1,5 +1,5 @@
 {
-  "name": "ontology",
+  "name": "ontograph-cli",
   "type": "module",
   "version": "0.0.1",
   "packageManager": "pnpm@11.4.0",
@@ -8,10 +8,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git@github.com:imba97/ontology.git"
+    "url": "git@github.com:imba97/ontograph-cli.git"
   },
   "keywords": [
-    "ontology",
+    "ontograph-cli",
     "knowledge-graph",
     "entity",
     "relationship",
@@ -21,7 +21,7 @@
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "bin": {
-    "ontology": "./bin/ontology.mjs"
+    "ontograph": "./bin/ontograph.mjs"
   },
   "files": [
     "SKILL.md",
@@ -36,7 +36,7 @@
     "test:watch": "vitest",
     "lint": "eslint --cache",
     "prepare": "simple-git-hooks",
-    "ontology": "node bin/ontology.mjs"
+    "ontograph": "node bin/ontograph.mjs"
   },
   "dependencies": {
     "cac": "^7.0.0",

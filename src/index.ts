@@ -37,7 +37,7 @@ function getStore(options: GlobalOptions): OntologyStore {
   return new OntologyStore({ dataDir })
 }
 
-const cli = cac('ontology')
+const cli = cac('ontograph')
 
 cli.option('--data-dir <dir>', 'Data directory', {
   default: getDefaultDataDir()

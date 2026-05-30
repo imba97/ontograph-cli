@@ -4,7 +4,7 @@ import process from 'node:process'
 
 export function getDefaultDataDir(): string {
   const hermesHome = process.env.HERMES_HOME || path.join(os.homedir(), '.hermes')
-  return path.join(hermesHome, 'data', 'ontology')
+  return path.join(hermesHome, 'data', 'ontograph-cli')
 }
 
 export function parseKeyValue(args: string[]): Record<string, string> {

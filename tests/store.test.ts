@@ -7,11 +7,11 @@ let counter = 0
 
 function createStore(): OntologyStore {
   counter += 1
-  const testDir = path.join(os.tmpdir(), `ontology-test-${Date.now()}-${counter}`)
+  const testDir = path.join(os.tmpdir(), `ontograph-cli-test-${Date.now()}-${counter}`)
   return new OntologyStore({ dataDir: testDir })
 }
 
-describe('ontologyStore', () => {
+describe('ontographStore', () => {
   // ── Entity CRUD ─────────────────────────────────────────────────────────────
 
   it('should add and retrieve entities', () => {
