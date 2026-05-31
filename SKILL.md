@@ -1,7 +1,6 @@
 ---
 name: ontograph-cli
 description: Entity-relationship knowledge graph CLI — add entities, relate them, and query the graph. Useful for tracking people, projects, tasks and their relationships.
-version: 0.2.0
 platforms: [linux, macos]
 metadata:
   hermes:
@@ -124,5 +123,9 @@ ontograph info
 ## Installation
 
 ```bash
+# Optional: install globally
 pnpm add -g ontograph-cli
+
+# No install required: run directly
+pnpx ontograph-cli <command>
 ```

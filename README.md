@@ -7,7 +7,7 @@ Add entities, relate them, and query the graph — all from the terminal.
 ## Install
 
 ```bash
-pnpm add -g ontograph-cli
+pnpx skills add imba97/ontograph-cli -g -a your-agent
 ```
 
 ## Quick Start

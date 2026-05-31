@@ -7,7 +7,7 @@
 ## 安装
 
 ```bash
-pnpm add -g ontograph-cli
+pnpx skills add imba97/ontograph-cli -g -a your-agent
 ```
 
 ## 快速上手
