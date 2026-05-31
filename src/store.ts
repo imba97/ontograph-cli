@@ -10,6 +10,7 @@ import type {
 } from './types'
 import fs from 'node:fs'
 import path from 'node:path'
+import { consola } from 'consola'
 import yaml from 'yaml'
 import { parseEntityId } from './utils'
 import { validateEntity, validateRelation } from './validator'
@@ -18,46 +19,83 @@ type EntityIndex = Record<string, string[]>
 
 // Adjacency list for O(1) neighbor lookup
 type AdjacencyList = Record<string, Array<{ rel: string, neighbor: string }>>
+const STORE_PATHS = {
+  index: 'index.yaml',
+  relations: 'relations.yaml',
+  entitiesDir: 'entities'
+} as const
 
 export class OntologyStore {
   private dataDir: string
-  private indexPath: string
 
   // Cached views
   #graph: Graph | null = null
   #adj: AdjacencyList | null = null
+  #warned = new Set<string>()
 
   constructor(options: StoreOptions) {
     this.dataDir = options.dataDir
-    this.indexPath = path.join(this.dataDir, 'index.yaml')
     this.#ensureDataDir()
   }
 
   // ── Path helpers ─────────────────────────────────────────────────────────────
 
+  #indexPath(): string {
+    return path.join(this.dataDir, STORE_PATHS.index)
+  }
+
+  #relationsPath(): string {
+    return path.join(this.dataDir, STORE_PATHS.relations)
+  }
+
   private entityPath(type: string, id: string): string {
-    return path.join(this.dataDir, 'entities', type, `${id}.yaml`)
+    return path.join(this.dataDir, STORE_PATHS.entitiesDir, type, `${id}.yaml`)
+  }
+
+  #warnOnce(key: string, message: string): void {
+    if (this.#warned.has(key))
+      return
+    this.#warned.add(key)
+    consola.warn(message)
+  }
+
+  #readYaml<T>(filePath: string): T | null {
+    try {
+      const raw = fs.readFileSync(filePath, 'utf8')
+      return yaml.parse(raw) as T
+    }
+    catch {
+      return null
+    }
+  }
+
+  #writeYamlAtomic(filePath: string, data: unknown): void {
+    const tmp = `${filePath}.tmp`
+    fs.writeFileSync(tmp, yaml.stringify(data), 'utf8')
+    fs.renameSync(tmp, filePath)
   }
 
   // ── Index I/O ────────────────────────────────────────────────────────────────
 
   #loadIndex(): EntityIndex {
-    if (!fs.existsSync(this.indexPath))
+    const filePath = this.#indexPath()
+    if (!fs.existsSync(filePath))
       return {}
 
-    try {
-      const raw = fs.readFileSync(this.indexPath, 'utf8')
-      return (yaml.parse(raw) as { entities: EntityIndex }).entities ?? {}
-    }
-    catch {
+    const parsed = this.#readYaml<{ entities?: EntityIndex }>(filePath)
+    if (!parsed || typeof parsed !== 'object') {
+      this.#warnOnce(`bad-index:${filePath}`, `Malformed index YAML, fallback to empty index: ${filePath}`)
       return {}
     }
+
+    if (!parsed.entities || typeof parsed.entities !== 'object')
+      return {}
+
+    return parsed.entities
   }
 
   #saveIndex(index: EntityIndex): void {
-    const tmp = `${this.indexPath}.tmp`
-    fs.writeFileSync(tmp, yaml.stringify({ entities: index }), 'utf8')
-    fs.renameSync(tmp, this.indexPath)
+    this.#writeYamlAtomic(this.#indexPath(), { entities: index })
   }
 
   // ── Adjacency list ───────────────────────────────────────────────────────────
@@ -97,15 +135,17 @@ export class OntologyStore {
     for (const [type, ids] of Object.entries(index)) {
       for (const id of ids) {
         const filePath = this.entityPath(type, id)
-        if (!fs.existsSync(filePath))
+        if (!fs.existsSync(filePath)) {
+          this.#warnOnce(`missing-entity:${filePath}`, `Indexed entity file is missing, skipped: ${filePath}`)
           continue
-
-        try {
-          const raw = fs.readFileSync(filePath, 'utf8')
-          entities[`${type}:${id}`] = yaml.parse(raw) as Entity
         }
-        catch {
-          // Skip malformed files
+
+        const parsed = this.#readYaml<Entity>(filePath)
+        if (parsed && typeof parsed === 'object') {
+          entities[`${type}:${id}`] = parsed
+        }
+        else {
+          this.#warnOnce(`bad-entity:${filePath}`, `Malformed entity YAML, skipped: ${filePath}`)
         }
       }
     }
@@ -115,23 +155,20 @@ export class OntologyStore {
   }
 
   #loadRelations(): Relation[] {
-    const relPath = path.join(this.dataDir, 'relations.yaml')
+    const relPath = this.#relationsPath()
     if (!fs.existsSync(relPath))
       return []
 
-    try {
-      return yaml.parse(fs.readFileSync(relPath, 'utf8')) as Relation[]
-    }
-    catch {
+    const parsed = this.#readYaml<Relation[]>(relPath)
+    if (!parsed || !Array.isArray(parsed)) {
+      this.#warnOnce(`bad-relations:${relPath}`, `Malformed relations YAML, fallback to empty relations: ${relPath}`)
       return []
     }
+    return parsed
   }
 
   #saveRelations(relations: Relation[]): void {
-    const relPath = path.join(this.dataDir, 'relations.yaml')
-    const tmp = `${relPath}.tmp`
-    fs.writeFileSync(tmp, yaml.stringify(relations), 'utf8')
-    fs.renameSync(tmp, relPath)
+    this.#writeYamlAtomic(this.#relationsPath(), relations)
   }
 
   getGraph(): Graph {
@@ -345,5 +382,9 @@ export class OntologyStore {
   #ensureDataDir(): void {
     if (!fs.existsSync(this.dataDir))
       fs.mkdirSync(this.dataDir, { recursive: true })
+
+    const entitiesDir = path.join(this.dataDir, STORE_PATHS.entitiesDir)
+    if (!fs.existsSync(entitiesDir))
+      fs.mkdirSync(entitiesDir, { recursive: true })
   }
 }

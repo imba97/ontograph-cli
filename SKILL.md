@@ -94,7 +94,16 @@ ontograph info
 
 ## Data Storage
 
-`~/.hermes/data/ontograph-cli/entities.json`
+`~/.hermes/data/ontograph-cli`
+
+```text
+~/.hermes/data/ontograph-cli/
+  index.yaml
+  relations.yaml
+  entities/
+    <type>/
+      <id>.yaml
+```
 
 ## Hermes Agent Usage
 

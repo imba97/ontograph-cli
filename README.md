@@ -31,7 +31,18 @@ ontograph types
 
 ## Data
 
-Stored at `~/.hermes/data/ontograph-cli/entities.json` by default.
+Stored at `~/.hermes/data/ontograph-cli` by default.
+
+Directory layout:
+
+```text
+~/.hermes/data/ontograph-cli/
+  index.yaml
+  relations.yaml
+  entities/
+    <type>/
+      <id>.yaml
+```
 
 ## License
 

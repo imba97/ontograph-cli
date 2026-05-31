@@ -1,6 +1,8 @@
+import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import yaml from 'yaml'
 import { OntologyStore } from '../src/store'
 
 let counter = 0
@@ -20,6 +22,22 @@ describe('ontographStore', () => {
 
     const graph = store.getGraph()
     expect(graph.entities['person:test']).toEqual({ type: 'person', name: 'Test User' })
+  })
+
+  it('should persist entity using YAML file layout', () => {
+    const store = createStore()
+    store.addEntity('person:yaml-layout', { type: 'person', name: 'YAML Layout' })
+
+    const dataDir = store.getDataDir()
+    const indexPath = path.join(dataDir, 'index.yaml')
+    const entityPath = path.join(dataDir, 'entities', 'person', 'yaml-layout.yaml')
+
+    expect(fs.existsSync(indexPath)).toBe(true)
+    expect(fs.existsSync(entityPath)).toBe(true)
+
+    const indexRaw = fs.readFileSync(indexPath, 'utf8')
+    const parsed = yaml.parse(indexRaw) as { entities?: Record<string, string[]> }
+    expect(parsed.entities?.person).toContain('yaml-layout')
   })
 
   it('should throw on duplicate entity', () => {
@@ -49,6 +67,25 @@ describe('ontographStore', () => {
     const graph = store.getGraph()
     expect(graph.entities['person:a']).toBeUndefined()
     expect(graph.relations).toHaveLength(0)
+  })
+
+  it('should skip missing and malformed indexed entity files', () => {
+    const store = createStore()
+    store.addEntity('person:missing', { type: 'person', name: 'Missing User' })
+    store.addEntity('person:broken', { type: 'person', name: 'Broken User' })
+
+    const dataDir = store.getDataDir()
+    const missingPath = path.join(dataDir, 'entities', 'person', 'missing.yaml')
+    const brokenPath = path.join(dataDir, 'entities', 'person', 'broken.yaml')
+
+    fs.unlinkSync(missingPath)
+    fs.writeFileSync(brokenPath, 'name: [broken', 'utf8')
+
+    const reloaded = new OntologyStore({ dataDir })
+    const graph = reloaded.getGraph()
+
+    expect(graph.entities['person:missing']).toBeUndefined()
+    expect(graph.entities['person:broken']).toBeUndefined()
   })
 
   // ── Relation CRUD ───────────────────────────────────────────────────────────

@@ -109,7 +109,18 @@ project:website --has_task--> task:design
 
 ## 数据存储
 
-数据默认存储在 `~/.hermes/data/ontograph-cli/entities.json`，可通过 `--data-dir` 指定其他路径。
+数据默认存储在 `~/.hermes/data/ontograph-cli`，可通过 `--data-dir` 指定其他路径。
+
+目录结构如下：
+
+```text
+~/.hermes/data/ontograph-cli/
+  index.yaml
+  relations.yaml
+  entities/
+    <type>/
+      <id>.yaml
+```
 
 ## Hermes Agent 集成
 
