@@ -15,14 +15,15 @@ export function normalizeOptionList(value: string | string[] | undefined): strin
   return Array.isArray(value) ? value : [value]
 }
 
-export function parseKeyValue(args: string[]): Record<string, PropValue> {
+export function parseKeyValue(args: string[], arrayFields: Iterable<string> = []): Record<string, PropValue> {
   const result: Record<string, PropValue> = {}
+  const arrayFieldSet = new Set(arrayFields)
   for (const arg of args) {
     const eq = arg.indexOf('=')
     if (eq > 0 && eq < arg.length - 1) {
       const key = arg.slice(0, eq)
       const value = arg.slice(eq + 1)
-      if (key === 'tags') {
+      if (arrayFieldSet.has(key)) {
         result[key] = value.split(',').map(v => v.trim()).filter(Boolean)
       }
       else {

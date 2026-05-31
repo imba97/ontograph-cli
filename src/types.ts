@@ -1,7 +1,7 @@
 // ── User Schema Types ─────────────────────────────────────────────────────────
 
 export interface UserEntityField {
-  type: 'string' | 'number' | 'boolean'
+  type: 'string' | 'number' | 'boolean' | 'string[]' | 'number[]' | 'boolean[]'
   required?: boolean
   enum?: string[]
 }

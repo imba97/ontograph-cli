@@ -10,7 +10,8 @@ export function entityAdd(
   name: string,
   props: string[]
 ): void {
-  const extra = parseKeyValue(props)
+  const arrayFields = store.getArrayFieldsForType(type)
+  const extra = parseKeyValue(props, arrayFields)
 
   const entity: Entity = {
     type,

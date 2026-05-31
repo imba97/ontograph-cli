@@ -1,7 +1,7 @@
 import type { OntologyStore } from '../store'
 import type { Entity } from '../types'
 import { consola } from 'consola'
-import { parseKeyValue } from '../utils'
+import { parseEntityId, parseKeyValue } from '../utils'
 
 export function entityUpdate(
   store: OntologyStore,
@@ -9,7 +9,9 @@ export function entityUpdate(
   name: string | undefined,
   fullId: string
 ): void {
-  const extra = parseKeyValue(props)
+  const { type } = parseEntityId(fullId)
+  const arrayFields = store.getArrayFieldsForType(type)
+  const extra = parseKeyValue(props, arrayFields)
   const patch: Partial<Entity> = {
     ...extra
   }

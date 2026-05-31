@@ -10,10 +10,17 @@ describe('parseKeyValue', () => {
     })
   })
 
-  it('should parse tags as string array', () => {
-    const parsed = parseKeyValue(['tags=1997,backend, cli'])
+  it('should parse array fields from schema provided set', () => {
+    const parsed = parseKeyValue(['tags=1997,backend, cli'], ['tags'])
     expect(parsed).toEqual({
       tags: ['1997', 'backend', 'cli']
+    })
+  })
+
+  it('should keep comma value as string when field is not array', () => {
+    const parsed = parseKeyValue(['owner=a,b'])
+    expect(parsed).toEqual({
+      owner: 'a,b'
     })
   })
 })

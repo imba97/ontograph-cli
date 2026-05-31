@@ -7,6 +7,7 @@ import yaml from 'yaml'
 import { knownTypes } from '../validator'
 
 const USER_ENTITY_DIR = 'user-entities'
+const SUPPORTED_FIELD_TYPES = new Set(['string', 'number', 'boolean', 'string[]', 'number[]', 'boolean[]'])
 
 function getEntityDir(dataDir: string): string {
   return path.join(dataDir, USER_ENTITY_DIR)
@@ -186,11 +187,11 @@ function buildEntitySchema(
   }
 
   for (const f of fields) {
-    if (!allTypes.includes(f.key) && f.type !== 'string' && f.type !== 'number' && f.type !== 'boolean') {
+    if (!allTypes.includes(f.key) && !SUPPORTED_FIELD_TYPES.has(f.type)) {
       throw new Error(`Unknown type in field "${f.key}": "${f.type}". Known types: ${allTypes.join(', ')}`)
     }
     schema.fields[f.key] = {
-      type: f.type as 'string' | 'number' | 'boolean',
+      type: f.type as 'string' | 'number' | 'boolean' | 'string[]' | 'number[]' | 'boolean[]',
       required: f.required,
       enum: f.enum
     }

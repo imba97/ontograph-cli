@@ -6,14 +6,15 @@ import type {
   RelatedResult,
   Relation,
   SearchResult,
-  StoreOptions
+  StoreOptions,
+  UserEntitySchema
 } from './types'
 import fs from 'node:fs'
 import path from 'node:path'
 import { consola } from 'consola'
 import yaml from 'yaml'
 import { parseEntityId } from './utils'
-import { validateEntity, validateRelation } from './validator'
+import { getPresetArrayFields, validateEntity, validateRelation } from './validator'
 
 type EntityIndex = Record<string, string[]>
 
@@ -420,6 +421,24 @@ export class OntologyStore {
 
   getDataDir(): string {
     return this.dataDir
+  }
+
+  getArrayFieldsForType(type: string): Set<string> {
+    const arrayFields = new Set<string>(getPresetArrayFields(type))
+    const schemaPath = path.join(this.dataDir, 'user-entities', `${type}.yaml`)
+    if (!fs.existsSync(schemaPath))
+      return arrayFields
+
+    const schema = this.readYaml<UserEntitySchema>(schemaPath)
+    if (!schema?.fields)
+      return arrayFields
+
+    for (const [fieldName, fieldDef] of Object.entries(schema.fields)) {
+      if (fieldDef.type.endsWith('[]'))
+        arrayFields.add(fieldName)
+    }
+
+    return arrayFields
   }
 
   // ── Internal ───────────────────────────────────────────────────────────────

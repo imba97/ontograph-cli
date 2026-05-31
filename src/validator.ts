@@ -82,6 +82,15 @@ const entitySchemas: Record<string, z.ZodType<Record<string, unknown>>> = {
   location: locationSchema
 }
 
+const presetArrayFields: Record<string, string[]> = {
+  project: ['tags'],
+  task: ['tags'],
+  person: ['tags'],
+  event: ['tags'],
+  document: ['tags'],
+  organization: ['tags']
+}
+
 // ── Validation Error Types ────────────────────────────────────────────────────
 
 export interface ValidationError {
@@ -173,3 +182,7 @@ export function validateRelation(
 }
 
 export const knownTypes = ['person', 'project', 'task', 'event', 'document', 'organization', 'location']
+
+export function getPresetArrayFields(type: string): string[] {
+  return presetArrayFields[type] ?? []
+}

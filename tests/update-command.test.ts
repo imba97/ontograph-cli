@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { entityTypeAdd } from '../src/commands/entity-type'
 import { entityUpdate } from '../src/commands/update'
 import { createStore, seedGraph } from './store/helpers'
 
@@ -32,6 +33,32 @@ describe('entity update command helper', () => {
 
     expect(store.getGraph().entities['person:tags']).toMatchObject({
       tags: ['alpha', 'beta']
+    })
+  })
+
+  it('should parse schema defined custom array field', () => {
+    const store = createStore()
+    entityTypeAdd(store, 'book', 'Book', 'Book entity', [
+      { key: 'name', type: 'string', required: true },
+      { key: 'authors', type: 'string[]', required: false }
+    ])
+    store.addEntity('book:1', { type: 'book', name: 'Book One' })
+
+    entityUpdate(store, ['authors=a,b'], undefined, 'book:1')
+
+    expect(store.getGraph().entities['book:1']).toMatchObject({
+      authors: ['a', 'b']
+    })
+  })
+
+  it('should keep non array field as string even with comma', () => {
+    const store = createStore()
+    store.addEntity('person:notes', { type: 'person', name: 'Note User' })
+
+    entityUpdate(store, ['notes=a,b'], undefined, 'person:notes')
+
+    expect(store.getGraph().entities['person:notes']).toMatchObject({
+      notes: 'a,b'
     })
   })
 
