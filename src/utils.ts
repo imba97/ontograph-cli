@@ -7,12 +7,22 @@ export function getDefaultDataDir(): string {
   return path.join(hermesHome, 'data', 'ontograph-cli')
 }
 
-export function parseKeyValue(args: string[]): Record<string, string> {
-  const result: Record<string, string> = {}
+export type PropValue = string | string[]
+
+export function parseKeyValue(args: string[]): Record<string, PropValue> {
+  const result: Record<string, PropValue> = {}
   for (const arg of args) {
     const eq = arg.indexOf('=')
-    if (eq > 0 && eq < arg.length - 1)
-      result[arg.slice(0, eq)] = arg.slice(eq + 1)
+    if (eq > 0 && eq < arg.length - 1) {
+      const key = arg.slice(0, eq)
+      const value = arg.slice(eq + 1)
+      if (key === 'tags') {
+        result[key] = value.split(',').map(v => v.trim()).filter(Boolean)
+      }
+      else {
+        result[key] = value
+      }
+    }
   }
   return result
 }
