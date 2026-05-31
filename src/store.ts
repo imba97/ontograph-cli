@@ -33,22 +33,22 @@ export class OntologyStore {
   private dataDir: string
 
   // Cached views
-  #graph: Graph | null = null
-  #adj: AdjacencyIndex | null = null
-  #warned = new Set<string>()
+  private graph: Graph | null = null
+  private adj: AdjacencyIndex | null = null
+  private warned = new Set<string>()
 
   constructor(options: StoreOptions) {
     this.dataDir = options.dataDir
-    this.#ensureDataDir()
+    this.ensureDataDir()
   }
 
   // ── Path helpers ─────────────────────────────────────────────────────────────
 
-  #indexPath(): string {
+  private indexPath(): string {
     return path.join(this.dataDir, STORE_PATHS.index)
   }
 
-  #relationsPath(): string {
+  private relationsPath(): string {
     return path.join(this.dataDir, STORE_PATHS.relations)
   }
 
@@ -56,14 +56,14 @@ export class OntologyStore {
     return path.join(this.dataDir, STORE_PATHS.entitiesDir, type, `${id}.yaml`)
   }
 
-  #warnOnce(key: string, message: string): void {
-    if (this.#warned.has(key))
+  private warnOnce(key: string, message: string): void {
+    if (this.warned.has(key))
       return
-    this.#warned.add(key)
+    this.warned.add(key)
     consola.warn(message)
   }
 
-  #readYaml<T>(filePath: string): T | null {
+  private readYaml<T>(filePath: string): T | null {
     try {
       const raw = fs.readFileSync(filePath, 'utf8')
       return yaml.parse(raw) as T
@@ -73,7 +73,7 @@ export class OntologyStore {
     }
   }
 
-  #writeYamlAtomic(filePath: string, data: unknown): void {
+  private writeYamlAtomic(filePath: string, data: unknown): void {
     const tmp = `${filePath}.tmp`
     fs.writeFileSync(tmp, yaml.stringify(data), 'utf8')
     fs.renameSync(tmp, filePath)
@@ -81,14 +81,14 @@ export class OntologyStore {
 
   // ── Index I/O ────────────────────────────────────────────────────────────────
 
-  #loadIndex(): EntityIndex {
-    const filePath = this.#indexPath()
+  private loadIndex(): EntityIndex {
+    const filePath = this.indexPath()
     if (!fs.existsSync(filePath))
       return {}
 
-    const parsed = this.#readYaml<{ entities?: EntityIndex }>(filePath)
+    const parsed = this.readYaml<{ entities?: EntityIndex }>(filePath)
     if (!parsed || typeof parsed !== 'object') {
-      this.#warnOnce(`bad-index:${filePath}`, `Malformed index YAML, fallback to empty index: ${filePath}`)
+      this.warnOnce(`bad-index:${filePath}`, `Malformed index YAML, fallback to empty index: ${filePath}`)
       return {}
     }
 
@@ -98,22 +98,22 @@ export class OntologyStore {
     return parsed.entities
   }
 
-  #saveIndex(index: EntityIndex): void {
-    this.#writeYamlAtomic(this.#indexPath(), { entities: index })
+  private saveIndex(index: EntityIndex): void {
+    this.writeYamlAtomic(this.indexPath(), { entities: index })
   }
 
-  #updateIndex(mutator: (index: EntityIndex) => void): void {
-    const index = this.#loadIndex()
+  private updateIndex(mutator: (index: EntityIndex) => void): void {
+    const index = this.loadIndex()
     mutator(index)
-    this.#saveIndex(index)
+    this.saveIndex(index)
   }
 
   // ── Adjacency list ───────────────────────────────────────────────────────────
 
   /** Build adjacency index from relations (or return cached). */
-  #getAdj(): AdjacencyIndex {
-    if (this.#adj)
-      return this.#adj
+  private getAdj(): AdjacencyIndex {
+    if (this.adj)
+      return this.adj
 
     const graph = this.load()
     const out: AdjacencyList = {}
@@ -127,63 +127,63 @@ export class OntologyStore {
         incoming[r.to] = []
       incoming[r.to].push({ rel: r.rel, neighbor: r.from })
     }
-    this.#adj = { out, in: incoming }
-    return this.#adj
+    this.adj = { out, in: incoming }
+    return this.adj
   }
 
   /** Invalidate caches. Call after any write operation. */
-  #invalidate(): void {
-    this.#graph = null
-    this.#adj = null
+  private invalidate(): void {
+    this.graph = null
+    this.adj = null
   }
 
   // ── Persistence ─────────────────────────────────────────────────────────────
 
   private load(): Graph {
-    if (this.#graph)
-      return this.#graph
+    if (this.graph)
+      return this.graph
 
-    const index = this.#loadIndex()
+    const index = this.loadIndex()
     const entities: Record<string, Entity> = {}
-    const relations = this.#loadRelations()
+    const relations = this.loadRelations()
 
     for (const [type, ids] of Object.entries(index)) {
       for (const id of ids) {
         const filePath = this.entityPath(type, id)
         if (!fs.existsSync(filePath)) {
-          this.#warnOnce(`missing-entity:${filePath}`, `Indexed entity file is missing, skipped: ${filePath}`)
+          this.warnOnce(`missing-entity:${filePath}`, `Indexed entity file is missing, skipped: ${filePath}`)
           continue
         }
 
-        const parsed = this.#readYaml<Entity>(filePath)
+        const parsed = this.readYaml<Entity>(filePath)
         if (parsed && typeof parsed === 'object') {
           entities[`${type}:${id}`] = parsed
         }
         else {
-          this.#warnOnce(`bad-entity:${filePath}`, `Malformed entity YAML, skipped: ${filePath}`)
+          this.warnOnce(`bad-entity:${filePath}`, `Malformed entity YAML, skipped: ${filePath}`)
         }
       }
     }
 
-    this.#graph = { entities, relations }
-    return this.#graph
+    this.graph = { entities, relations }
+    return this.graph
   }
 
-  #loadRelations(): Relation[] {
-    const relPath = this.#relationsPath()
+  private loadRelations(): Relation[] {
+    const relPath = this.relationsPath()
     if (!fs.existsSync(relPath))
       return []
 
-    const parsed = this.#readYaml<Relation[]>(relPath)
+    const parsed = this.readYaml<Relation[]>(relPath)
     if (!parsed || !Array.isArray(parsed)) {
-      this.#warnOnce(`bad-relations:${relPath}`, `Malformed relations YAML, fallback to empty relations: ${relPath}`)
+      this.warnOnce(`bad-relations:${relPath}`, `Malformed relations YAML, fallback to empty relations: ${relPath}`)
       return []
     }
     return parsed
   }
 
-  #saveRelations(relations: Relation[]): void {
-    this.#writeYamlAtomic(this.#relationsPath(), relations)
+  private saveRelations(relations: Relation[]): void {
+    this.writeYamlAtomic(this.relationsPath(), relations)
   }
 
   getGraph(): Graph {
@@ -210,14 +210,14 @@ export class OntologyStore {
     fs.writeFileSync(filePath, yaml.stringify(entity), 'utf8')
 
     // Incrementally update index
-    this.#updateIndex((index) => {
+    this.updateIndex((index) => {
       if (!index[type])
         index[type] = []
       if (!index[type].includes(id))
         index[type].push(id)
     })
 
-    this.#invalidate()
+    this.invalidate()
   }
 
   removeEntity(fullId: string): void {
@@ -232,7 +232,7 @@ export class OntologyStore {
       fs.unlinkSync(filePath)
 
     // Incrementally update index
-    this.#updateIndex((index) => {
+    this.updateIndex((index) => {
       if (!index[type])
         return
       index[type] = index[type].filter(i => i !== id)
@@ -241,9 +241,9 @@ export class OntologyStore {
     })
 
     // Remove relations involving this entity
-    this.#saveRelations(graph.relations.filter(r => r.from !== fullId && r.to !== fullId))
+    this.saveRelations(graph.relations.filter(r => r.from !== fullId && r.to !== fullId))
 
-    this.#invalidate()
+    this.invalidate()
   }
 
   // ── Relation CRUD ───────────────────────────────────────────────────────────
@@ -257,15 +257,15 @@ export class OntologyStore {
 
     const exists = graph.relations.some(r => r.from === from && r.rel === rel && r.to === to)
     if (!exists) {
-      this.#saveRelations([...graph.relations, { from, rel, to }])
-      this.#invalidate()
+      this.saveRelations([...graph.relations, { from, rel, to }])
+      this.invalidate()
     }
   }
 
   removeRelation(from: string, rel: string, to: string): void {
     const graph = this.load()
-    this.#saveRelations(graph.relations.filter(r => !(r.from === from && r.rel === rel && r.to === to)))
-    this.#invalidate()
+    this.saveRelations(graph.relations.filter(r => !(r.from === from && r.rel === rel && r.to === to)))
+    this.invalidate()
   }
 
   // ── Queries ─────────────────────────────────────────────────────────────────
@@ -286,7 +286,7 @@ export class OntologyStore {
   }
 
   related(id: string, rel?: string): RelatedResult[] {
-    const adj = this.#getAdj()
+    const adj = this.getAdj()
     const graph = this.load()
     const results: RelatedResult[] = []
 
@@ -344,7 +344,7 @@ export class OntologyStore {
     if (from === to)
       return { path: [from], relations: [] }
 
-    const adj = this.#getAdj()
+    const adj = this.getAdj()
     interface Frame { id: string, path: string[] }
     const queue: Frame[] = [{ id: from, path: [from] }]
     let queueHead = 0
@@ -395,7 +395,7 @@ export class OntologyStore {
 
   // ── Internal ───────────────────────────────────────────────────────────────
 
-  #ensureDataDir(): void {
+  private ensureDataDir(): void {
     if (!fs.existsSync(this.dataDir))
       fs.mkdirSync(this.dataDir, { recursive: true })
 
