@@ -107,36 +107,46 @@ export function entityTypeAdd(
     throw new Error(`Entity type "${typeName}" already exists`)
   }
 
-  // Validate fromTypes and toTypes reference valid entity types
-  const allTypes = [...knownTypes, ...Object.keys(loadUserEntitySchemas(dataDir))]
-
-  const schema: UserEntitySchema = {
-    name,
-    description: description || undefined,
-    fields: {}
-  }
-
-  for (const f of fields) {
-    if (!allTypes.includes(f.key) && f.type !== 'string' && f.type !== 'number' && f.type !== 'boolean') {
-      throw new Error(`Unknown type in field "${f.key}": "${f.type}". Known types: ${allTypes.join(', ')}`)
-    }
-    schema.fields[f.key] = {
-      type: f.type as 'string' | 'number' | 'boolean',
-      required: f.required,
-      enum: f.enum
-    }
-  }
-
-  // Ensure name field exists
-  if (!schema.fields.name) {
-    schema.fields.name = { type: 'string', required: true }
-  }
+  const schema = buildEntitySchema(dataDir, name, description, fields)
 
   const dir = getEntityDir(dataDir)
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(schemaPath, yaml.stringify(schema), 'utf8')
 
   consola.success(`Added entity type: ${typeName}`)
+}
+
+export function entityTypeUpdate(
+  store: OntologyStore,
+  typeName: string,
+  name: string | undefined,
+  description: string | undefined,
+  fields?: Array<{ key: string, type: string, required: boolean, enum?: string[] }>
+): void {
+  const dataDir = store.getDataDir()
+
+  if (knownTypes.includes(typeName)) {
+    throw new Error(`Entity type "${typeName}" is a preset type and cannot be modified`)
+  }
+
+  const schemaPath = getEntityPath(dataDir, typeName)
+  if (!fs.existsSync(schemaPath))
+    throw new Error(`Entity type "${typeName}" not found`)
+
+  const raw = fs.readFileSync(schemaPath, 'utf8')
+  const existing = yaml.parse(raw) as UserEntitySchema
+  const nextName = name ?? existing.name ?? typeName
+  const nextDesc = description ?? existing.description ?? ''
+  const nextFields = fields ?? Object.entries(existing.fields ?? {}).map(([key, def]) => ({
+    key,
+    type: def.type,
+    required: Boolean(def.required),
+    enum: def.enum
+  }))
+
+  const schema = buildEntitySchema(dataDir, nextName, nextDesc, nextFields)
+  fs.writeFileSync(schemaPath, yaml.stringify(schema), 'utf8')
+  consola.success(`Updated entity type: ${typeName}`)
 }
 
 export function entityTypeRemove(store: OntologyStore, typeName: string): void {
@@ -159,4 +169,35 @@ export function entityTypeRemove(store: OntologyStore, typeName: string): void {
 
   fs.unlinkSync(schemaPath)
   consola.success(`Removed entity type: ${typeName}`)
+}
+
+function buildEntitySchema(
+  dataDir: string,
+  name: string,
+  description: string,
+  fields: Array<{ key: string, type: string, required: boolean, enum?: string[] }>
+): UserEntitySchema {
+  const allTypes = [...knownTypes, ...Object.keys(loadUserEntitySchemas(dataDir))]
+
+  const schema: UserEntitySchema = {
+    name,
+    description: description || undefined,
+    fields: {}
+  }
+
+  for (const f of fields) {
+    if (!allTypes.includes(f.key) && f.type !== 'string' && f.type !== 'number' && f.type !== 'boolean') {
+      throw new Error(`Unknown type in field "${f.key}": "${f.type}". Known types: ${allTypes.join(', ')}`)
+    }
+    schema.fields[f.key] = {
+      type: f.type as 'string' | 'number' | 'boolean',
+      required: f.required,
+      enum: f.enum
+    }
+  }
+
+  if (!schema.fields.name)
+    schema.fields.name = { type: 'string', required: true }
+
+  return schema
 }

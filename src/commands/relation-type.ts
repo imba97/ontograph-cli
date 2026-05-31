@@ -107,32 +107,44 @@ export function relationTypeAdd(
     throw new Error(`Relation type "${relName}" already exists`)
   }
 
-  // Validate fromTypes and toTypes reference valid entity types
-  const allTypes = [...knownTypes, ...loadUserEntitySchemas(dataDir)]
-
-  for (const t of fromTypes) {
-    if (!allTypes.includes(t)) {
-      throw new Error(`Unknown entity type in fromTypes: "${t}". Known: ${allTypes.join(', ')}`)
-    }
-  }
-  for (const t of toTypes) {
-    if (!allTypes.includes(t)) {
-      throw new Error(`Unknown entity type in toTypes: "${t}". Known: ${allTypes.join(', ')}`)
-    }
-  }
-
-  const schema: UserRelationSchema = {
-    name,
-    description: description || undefined,
-    fromTypes,
-    toTypes
-  }
+  const schema = buildRelationSchema(dataDir, name, description, fromTypes, toTypes)
 
   const dir = getRelationDir(dataDir)
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(schemaPath, yaml.stringify(schema), 'utf8')
 
   consola.success(`Added relation type: ${relName}`)
+}
+
+export function relationTypeUpdate(
+  store: OntologyStore,
+  relName: string,
+  name: string | undefined,
+  description: string | undefined,
+  fromTypes?: string[],
+  toTypes?: string[]
+): void {
+  const dataDir = store.getDataDir()
+
+  if (ALL_RELATION_TYPES.includes(relName))
+    throw new Error(`Relation type "${relName}" is a preset and cannot be modified`)
+
+  const schemaPath = getRelationPath(dataDir, relName)
+  if (!fs.existsSync(schemaPath))
+    throw new Error(`Relation type "${relName}" not found`)
+
+  const raw = fs.readFileSync(schemaPath, 'utf8')
+  const existing = yaml.parse(raw) as UserRelationSchema
+  const schema = buildRelationSchema(
+    dataDir,
+    name ?? existing.name ?? relName,
+    description ?? existing.description ?? '',
+    fromTypes ?? existing.fromTypes,
+    toTypes ?? existing.toTypes
+  )
+
+  fs.writeFileSync(schemaPath, yaml.stringify(schema), 'utf8')
+  consola.success(`Updated relation type: ${relName}`)
 }
 
 export function relationTypeRemove(store: OntologyStore, relName: string): void {
@@ -166,4 +178,30 @@ function loadUserEntitySchemas(dataDir: string): string[] {
   return fs.readdirSync(dir)
     .filter(f => f.endsWith('.yaml'))
     .map(f => f.replace(/\.yaml$/, ''))
+}
+
+function buildRelationSchema(
+  dataDir: string,
+  name: string,
+  description: string,
+  fromTypes: string[],
+  toTypes: string[]
+): UserRelationSchema {
+  const allTypes = [...knownTypes, ...loadUserEntitySchemas(dataDir)]
+
+  for (const t of fromTypes) {
+    if (!allTypes.includes(t))
+      throw new Error(`Unknown entity type in fromTypes: "${t}". Known: ${allTypes.join(', ')}`)
+  }
+  for (const t of toTypes) {
+    if (!allTypes.includes(t))
+      throw new Error(`Unknown entity type in toTypes: "${t}". Known: ${allTypes.join(', ')}`)
+  }
+
+  return {
+    name,
+    description: description || undefined,
+    fromTypes,
+    toTypes
+  }
 }

@@ -106,6 +106,28 @@ ontograph list [type]
 ontograph types
 ```
 
+### `entity-type <action> [name]`
+
+管理自定义实体类型，支持 `list` `view` `add` `remove` `update`。
+
+```bash
+# 更新自定义实体类型定义
+ontograph entity-type update <name> [--name <显示名>] [--desc <描述>] [--field <字段定义...>]
+```
+
+字段定义格式与 `add` 保持一致：`fieldKey:fieldType:required:enum1,enum2`。
+
+### `relation-type <action> [name]`
+
+管理自定义关系类型，支持 `list` `view` `add` `remove` `update`。
+
+```bash
+# 更新自定义关系类型定义
+ontograph relation-type update <name> [--name <显示名>] [--desc <描述>] [--from <类型...>] [--to <类型...>]
+```
+
+说明：`update` 采用强制更新策略，会直接覆盖定义文件，不做历史数据兼容性检查。
+
 ## 概念
 
 ### 实体 (Entity)

@@ -6,6 +6,7 @@ import {
   entityTypeAdd,
   entityTypeList,
   entityTypeRemove,
+  entityTypeUpdate,
   entityTypeView
 } from './commands/entity-type'
 import {
@@ -23,6 +24,7 @@ import {
   relationTypeAdd,
   relationTypeList,
   relationTypeRemove,
+  relationTypeUpdate,
   relationTypeView
 } from './commands/relation-type'
 import { entityUpdate } from './commands/update'
@@ -172,7 +174,7 @@ cli
 // ── Type Management ───────────────────────────────────────────────────────────
 
 cli
-  .command('entity-type <action> [name]', 'Entity type management: list, view, add, remove')
+  .command('entity-type <action> [name]', 'Entity type management: list, view, add, update, remove')
   .option('--name <name>', 'Display name')
   .option('--desc <description>', 'Description')
   .option('--field <fields...>', 'Field definitions (e.g. --field status:string:true)')
@@ -208,15 +210,33 @@ cli
           throw new Error('Name required for remove')
         entityTypeRemove(store, name)
         break
+      case 'update':
+        if (!name)
+          throw new Error('Name required for update')
+        {
+          const fields = options.field
+            ? (Array.isArray(options.field) ? options.field : [options.field]).map((f: string) => {
+                const parts = f.split(':')
+                return {
+                  key: parts[0],
+                  type: parts[1] || 'string',
+                  required: parts[2] !== 'false',
+                  enum: parts[3] ? parts[3].split(',') : undefined
+                }
+              })
+            : undefined
+          entityTypeUpdate(store, name, options.name, options.desc, fields)
+        }
+        break
       default:
-        throw new Error(`Unknown action: ${action}. Valid: list, view, add, remove`)
+        throw new Error(`Unknown action: ${action}. Valid: list, view, add, remove, update`)
     }
   })
 
 // ── Relation Type Management ───────────────────────────────────────────────────
 
 cli
-  .command('relation-type <action> [name]', 'Relation type management: list, view, add, remove')
+  .command('relation-type <action> [name]', 'Relation type management: list, view, add, update, remove')
   .option('--name <name>', 'Display name')
   .option('--desc <description>', 'Description')
   .option('--from <types...>', 'Allowed source entity types')
@@ -251,8 +271,20 @@ cli
           throw new Error('Name required for remove')
         relationTypeRemove(store, name)
         break
+      case 'update':
+        if (!name)
+          throw new Error('Name required for update')
+        relationTypeUpdate(
+          store,
+          name,
+          options.name,
+          options.desc,
+          options.from ? fromTypes : undefined,
+          options.to ? toTypes : undefined
+        )
+        break
       default:
-        throw new Error(`Unknown action: ${action}. Valid: list, view, add, remove`)
+        throw new Error(`Unknown action: ${action}. Valid: list, view, add, remove, update`)
     }
   })
 

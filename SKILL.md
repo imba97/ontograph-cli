@@ -81,6 +81,26 @@ ontograph relations
 ontograph related <id> [--rel <relation>]
 ```
 
+### Custom Type Management
+
+```bash
+# Entity type
+ontograph entity-type list
+ontograph entity-type view <name>
+ontograph entity-type add <name> --name <display> --field <key:type:required:enum...>
+ontograph entity-type update <name> [--name <display>] [--desc <description>] [--field <key:type:required:enum...>]
+ontograph entity-type remove <name>
+
+# Relation type
+ontograph relation-type list
+ontograph relation-type view <name>
+ontograph relation-type add <name> --name <display> --from <types...> --to <types...>
+ontograph relation-type update <name> [--name <display>] [--desc <description>] [--from <types...>] [--to <types...>]
+ontograph relation-type remove <name>
+```
+
+`update` for custom types uses force apply behavior and does not perform backward compatibility checks on existing data.
+
 ### Advanced Queries
 
 ```bash
