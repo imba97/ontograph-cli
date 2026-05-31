@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseKeyValue } from '../src/utils'
+import { normalizeOptionList, parseKeyValue } from '../src/utils'
 
 describe('parseKeyValue', () => {
   it('should parse normal properties as string', () => {
@@ -15,5 +15,19 @@ describe('parseKeyValue', () => {
     expect(parsed).toEqual({
       tags: ['1997', 'backend', 'cli']
     })
+  })
+})
+
+describe('normalizeOptionList', () => {
+  it('should normalize undefined to empty array', () => {
+    expect(normalizeOptionList(undefined)).toEqual([])
+  })
+
+  it('should normalize string to single item array', () => {
+    expect(normalizeOptionList('timezone=+8')).toEqual(['timezone=+8'])
+  })
+
+  it('should keep array input as is', () => {
+    expect(normalizeOptionList(['a', 'b'])).toEqual(['a', 'b'])
   })
 })

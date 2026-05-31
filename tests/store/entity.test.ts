@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { consola } from 'consola'
+import { describe, expect, it, vi } from 'vitest'
 import { OntologyStore } from '../../src/store'
 import { createStore, seedGraph } from './helpers'
 
@@ -146,23 +147,31 @@ describe('store entity', () => {
   })
 
   it('should skip missing and malformed indexed entity files', () => {
-    const store = createStore()
-    seedGraph(store, [
-      ['person:missing', { type: 'person', name: 'Missing User' }],
-      ['person:broken', { type: 'person', name: 'Broken User' }]
-    ])
+    const warnSpy = vi.spyOn(consola, 'warn').mockImplementation(() => {})
+    try {
+      const store = createStore()
+      seedGraph(store, [
+        ['person:missing', { type: 'person', name: 'Missing User' }],
+        ['person:broken', { type: 'person', name: 'Broken User' }]
+      ])
 
-    const dataDir = store.getDataDir()
-    const missingPath = path.join(dataDir, 'entities', 'person', 'missing.yaml')
-    const brokenPath = path.join(dataDir, 'entities', 'person', 'broken.yaml')
+      const dataDir = store.getDataDir()
+      const missingPath = path.join(dataDir, 'entities', 'person', 'missing.yaml')
+      const brokenPath = path.join(dataDir, 'entities', 'person', 'broken.yaml')
 
-    fs.unlinkSync(missingPath)
-    fs.writeFileSync(brokenPath, 'name: [broken', 'utf8')
+      fs.unlinkSync(missingPath)
+      fs.writeFileSync(brokenPath, 'name: [broken', 'utf8')
 
-    const reloaded = new OntologyStore({ dataDir })
-    const graph = reloaded.getGraph()
+      const reloaded = new OntologyStore({ dataDir })
+      const graph = reloaded.getGraph()
 
-    expect(graph.entities['person:missing']).toBeUndefined()
-    expect(graph.entities['person:broken']).toBeUndefined()
+      expect(graph.entities['person:missing']).toBeUndefined()
+      expect(graph.entities['person:broken']).toBeUndefined()
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Indexed entity file is missing'))
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Malformed entity YAML'))
+    }
+    finally {
+      warnSpy.mockRestore()
+    }
   })
 })

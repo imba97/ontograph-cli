@@ -29,7 +29,7 @@ import {
 } from './commands/relation-type'
 import { entityUpdate } from './commands/update'
 import { OntologyStore } from './store'
-import { getDefaultDataDir } from './utils'
+import { getDefaultDataDir, normalizeOptionList } from './utils'
 
 interface GlobalOptions {
   dataDir?: string
@@ -55,7 +55,8 @@ cli
   .action((type: string, id: string, options) => {
     const store = getStore(options)
     const name = options.name || id
-    entityAdd(store, type, id, name, options.prop || [])
+    const props = normalizeOptionList(options.prop)
+    entityAdd(store, type, id, name, props)
   })
 
 cli
@@ -64,7 +65,8 @@ cli
   .option('-p, --prop <key=value...>', 'Updated properties')
   .action((id: string, options) => {
     const store = getStore(options)
-    entityUpdate(store, id, options.name, options.prop || [])
+    const props = normalizeOptionList(options.prop)
+    entityUpdate(store, props, options.name, id)
   })
 
 cli

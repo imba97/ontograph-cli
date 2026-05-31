@@ -9,6 +9,12 @@ export function getDefaultDataDir(): string {
 
 export type PropValue = string | string[]
 
+export function normalizeOptionList(value: string | string[] | undefined): string[] {
+  if (!value)
+    return []
+  return Array.isArray(value) ? value : [value]
+}
+
 export function parseKeyValue(args: string[]): Record<string, PropValue> {
   const result: Record<string, PropValue> = {}
   for (const arg of args) {

@@ -5,9 +5,9 @@ import { parseKeyValue } from '../utils'
 
 export function entityUpdate(
   store: OntologyStore,
-  fullId: string,
+  props: string[],
   name: string | undefined,
-  props: string[]
+  fullId: string
 ): void {
   const extra = parseKeyValue(props)
   const patch: Partial<Entity> = {
