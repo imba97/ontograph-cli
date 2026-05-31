@@ -53,6 +53,12 @@ ontograph add <type> <id> --name <name> [--prop key=value ...]
 ontograph remove <id>
 ```
 
+### Update Entity
+
+```bash
+ontograph update <id> [--name <name>] [--prop key=value ...]
+```
+
 ### Relate / Unrelate
 
 ```bash

@@ -17,6 +17,9 @@ pnpx skills add imba97/ontograph-cli -g -a your-agent
 ontograph add person imba97 --name "imba久期" --prop timezone=+8
 ontograph add project website --name "网站重构" --prop status=active
 
+# 更新实体
+ontograph update person:imba97 --name "imba97" --prop timezone=+9
+
 # 建立关系
 ontograph relate person:imba97 owns project:website
 
@@ -37,6 +40,22 @@ ontograph types
 
 ```bash
 ontograph add <type> <id> --name <名称> [--prop key=value ...]
+```
+
+### `update <id>`
+
+更新已存在实体，支持部分字段更新。
+
+```bash
+ontograph update <id> [--name <名称>] [--prop key=value ...]
+```
+
+### `remove <id>`
+
+删除实体，并级联移除相关关系。
+
+```bash
+ontograph remove <id>
 ```
 
 ### `relate <from> <rel> <to>`

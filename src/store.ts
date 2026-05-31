@@ -220,6 +220,35 @@ export class OntologyStore {
     this.invalidate()
   }
 
+  updateEntity(fullId: string, patch: Partial<Entity>): void {
+    const graph = this.load()
+    const existing = graph.entities[fullId]
+
+    if (!existing)
+      throw new Error(`Entity "${fullId}" not found`)
+
+    if (patch.type && patch.type !== existing.type)
+      throw new Error(`Entity "${fullId}" type cannot be changed`)
+
+    const merged: Entity = {
+      ...existing,
+      ...patch,
+      type: existing.type
+    }
+
+    const errors = validateEntity(merged.type, merged)
+    if (errors.length > 0) {
+      const msgs = errors.map(e => `[${e.field}] ${e.message}`).join('; ')
+      throw new Error(`Validation failed: ${msgs}`)
+    }
+
+    const { type, id } = parseEntityId(fullId)
+    const filePath = this.entityPath(type, id)
+    fs.writeFileSync(filePath, yaml.stringify(merged), 'utf8')
+
+    this.invalidate()
+  }
+
   removeEntity(fullId: string): void {
     const graph = this.load()
 

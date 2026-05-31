@@ -40,6 +40,93 @@ describe('store entity', () => {
     }).toThrow('Validation failed')
   })
 
+  it('should update entity fields with merge patch', () => {
+    const store = createStore()
+    store.addEntity('person:update', {
+      type: 'person',
+      name: 'Alice',
+      timezone: '+8',
+      tags: ['a']
+    })
+
+    store.updateEntity('person:update', {
+      name: 'Alice Updated',
+      tags: ['a', 'b']
+    })
+
+    const graph = store.getGraph()
+    expect(graph.entities['person:update']).toEqual({
+      type: 'person',
+      name: 'Alice Updated',
+      timezone: '+8',
+      tags: ['a', 'b']
+    })
+  })
+
+  it('should persist updated entity to yaml file', () => {
+    const store = createStore()
+    store.addEntity('person:persist', { type: 'person', name: 'Before' })
+    store.updateEntity('person:persist', {
+      name: 'After',
+      city: 'Shenzhen'
+    })
+
+    const reloaded = new OntologyStore({ dataDir: store.getDataDir() })
+    expect(reloaded.getGraph().entities['person:persist']).toEqual({
+      type: 'person',
+      name: 'After',
+      city: 'Shenzhen'
+    })
+  })
+
+  it('should throw when updating missing entity', () => {
+    const store = createStore()
+    expect(() => {
+      store.updateEntity('person:missing', { name: 'Nope' })
+    }).toThrow('not found')
+  })
+
+  it('should validate updated entity against schema', () => {
+    const store = createStore()
+    store.addEntity('project:alpha', {
+      type: 'project',
+      name: 'Alpha',
+      status: 'active'
+    })
+
+    expect(() => {
+      store.updateEntity('project:alpha', { status: 'invalid-status' })
+    }).toThrow('Validation failed')
+  })
+
+  it('should reject changing entity type during update', () => {
+    const store = createStore()
+    store.addEntity('person:type-lock', { type: 'person', name: 'Type Locked' })
+
+    expect(() => {
+      store.updateEntity('person:type-lock', { type: 'project' })
+    }).toThrow('type cannot be changed')
+  })
+
+  it('should keep relations after entity update', () => {
+    const store = createStore()
+    seedGraph(
+      store,
+      [
+        ['person:owner', { type: 'person', name: 'Owner' }],
+        ['project:work', { type: 'project', name: 'Work' }]
+      ],
+      [['person:owner', 'owns', 'project:work']]
+    )
+
+    store.updateEntity('person:owner', { name: 'Owner Updated' })
+
+    const graph = store.getGraph()
+    expect(graph.relations).toEqual([
+      { from: 'person:owner', rel: 'owns', to: 'project:work' }
+    ])
+  })
+
   it('should remove entity and cascading relations', () => {
     const store = createStore()
     seedGraph(

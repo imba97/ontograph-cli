@@ -25,6 +25,7 @@ import {
   relationTypeRemove,
   relationTypeView
 } from './commands/relation-type'
+import { entityUpdate } from './commands/update'
 import { OntologyStore } from './store'
 import { getDefaultDataDir } from './utils'
 
@@ -53,6 +54,15 @@ cli
     const store = getStore(options)
     const name = options.name || id
     entityAdd(store, type, id, name, options.prop || [])
+  })
+
+cli
+  .command('update <id>', 'Update an existing entity')
+  .option('-n, --name <name>', 'Entity name')
+  .option('-p, --prop <key=value...>', 'Updated properties')
+  .action((id: string, options) => {
+    const store = getStore(options)
+    entityUpdate(store, id, options.name, options.prop || [])
   })
 
 cli
