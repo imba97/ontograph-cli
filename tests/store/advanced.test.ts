@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { createStore } from './helpers'
+import { createStore, seedGraph } from './helpers'
 
 describe('store advanced query', () => {
   it('should aggregate by type', () => {
     const store = createStore()
-    store.addEntity('person:a', { type: 'person', name: 'Alice' })
-    store.addEntity('project:b', { type: 'project', name: 'Project B' })
-    store.addEntity('project:c', { type: 'project', name: 'Project C' })
+    seedGraph(store, [
+      ['person:a', { type: 'person', name: 'Alice' }],
+      ['project:b', { type: 'project', name: 'Project B' }],
+      ['project:c', { type: 'project', name: 'Project C' }]
+    ])
 
     const result = store.aggregate(undefined, 'type')
     expect(result).toContainEqual({ key: 'person', count: 1 })
@@ -15,9 +17,11 @@ describe('store advanced query', () => {
 
   it('should aggregate by status', () => {
     const store = createStore()
-    store.addEntity('task:a', { type: 'task', name: 'Task A', status: 'open' })
-    store.addEntity('task:b', { type: 'task', name: 'Task B', status: 'open' })
-    store.addEntity('task:c', { type: 'task', name: 'Task C', status: 'done' })
+    seedGraph(store, [
+      ['task:a', { type: 'task', name: 'Task A', status: 'open' }],
+      ['task:b', { type: 'task', name: 'Task B', status: 'open' }],
+      ['task:c', { type: 'task', name: 'Task C', status: 'done' }]
+    ])
 
     const result = store.aggregate('task', 'status')
     expect(result).toContainEqual({ key: 'open', count: 2 })
@@ -26,11 +30,18 @@ describe('store advanced query', () => {
 
   it('should find path between two entities', () => {
     const store = createStore()
-    store.addEntity('person:a', { type: 'person', name: 'Alice' })
-    store.addEntity('project:b', { type: 'project', name: 'Project B' })
-    store.addEntity('task:c', { type: 'task', name: 'Task C' })
-    store.addRelation('person:a', 'owns', 'project:b')
-    store.addRelation('project:b', 'has_task', 'task:c')
+    seedGraph(
+      store,
+      [
+        ['person:a', { type: 'person', name: 'Alice' }],
+        ['project:b', { type: 'project', name: 'Project B' }],
+        ['task:c', { type: 'task', name: 'Task C' }]
+      ],
+      [
+        ['person:a', 'owns', 'project:b'],
+        ['project:b', 'has_task', 'task:c']
+      ]
+    )
 
     const path = store.findPath('person:a', 'task:c')
     expect(path).not.toBeNull()
@@ -40,8 +51,10 @@ describe('store advanced query', () => {
 
   it('should return null for unreachable entities', () => {
     const store = createStore()
-    store.addEntity('person:a', { type: 'person', name: 'Alice' })
-    store.addEntity('person:b', { type: 'person', name: 'Bob' })
+    seedGraph(store, [
+      ['person:a', { type: 'person', name: 'Alice' }],
+      ['person:b', { type: 'person', name: 'Bob' }]
+    ])
 
     const path = store.findPath('person:a', 'person:b')
     expect(path).toBeNull()
@@ -49,7 +62,7 @@ describe('store advanced query', () => {
 
   it('should throw on path with missing entity', () => {
     const store = createStore()
-    store.addEntity('person:a', { type: 'person', name: 'Alice' })
+    seedGraph(store, [['person:a', { type: 'person', name: 'Alice' }]])
     expect(() => {
       store.findPath('person:a', 'person:missing')
     }).toThrow('not found')
@@ -57,9 +70,11 @@ describe('store advanced query', () => {
 
   it('should query with custom predicate', () => {
     const store = createStore()
-    store.addEntity('task:a', { type: 'task', name: 'Task A', status: 'open', priority: 'high' })
-    store.addEntity('task:b', { type: 'task', name: 'Task B', status: 'open', priority: 'low' })
-    store.addEntity('task:c', { type: 'task', name: 'Task C', status: 'done', priority: 'high' })
+    seedGraph(store, [
+      ['task:a', { type: 'task', name: 'Task A', status: 'open', priority: 'high' }],
+      ['task:b', { type: 'task', name: 'Task B', status: 'open', priority: 'low' }],
+      ['task:c', { type: 'task', name: 'Task C', status: 'done', priority: 'high' }]
+    ])
 
     const openHigh = store.query(e => e.status === 'open' && e.priority === 'high')
     expect(openHigh).toHaveLength(1)

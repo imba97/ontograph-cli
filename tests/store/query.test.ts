@@ -1,14 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { createStore } from './helpers'
+import { createStore, seedGraph } from './helpers'
 
 describe('store query', () => {
   it('should query related entities (outgoing)', () => {
     const store = createStore()
-    store.addEntity('person:a', { type: 'person', name: 'Alice' })
-    store.addEntity('project:b', { type: 'project', name: 'Project B' })
-    store.addEntity('project:c', { type: 'project', name: 'Project C' })
-    store.addRelation('person:a', 'owns', 'project:b')
-    store.addRelation('person:a', 'owns', 'project:c')
+    seedGraph(
+      store,
+      [
+        ['person:a', { type: 'person', name: 'Alice' }],
+        ['project:b', { type: 'project', name: 'Project B' }],
+        ['project:c', { type: 'project', name: 'Project C' }]
+      ],
+      [
+        ['person:a', 'owns', 'project:b'],
+        ['person:a', 'owns', 'project:c']
+      ]
+    )
 
     const out = store.related('person:a')
     expect(out).toHaveLength(2)
@@ -22,9 +29,14 @@ describe('store query', () => {
 
   it('should query related entities (incoming)', () => {
     const store = createStore()
-    store.addEntity('person:a', { type: 'person', name: 'Alice' })
-    store.addEntity('project:b', { type: 'project', name: 'Project B' })
-    store.addRelation('person:a', 'owns', 'project:b')
+    seedGraph(
+      store,
+      [
+        ['person:a', { type: 'person', name: 'Alice' }],
+        ['project:b', { type: 'project', name: 'Project B' }]
+      ],
+      [['person:a', 'owns', 'project:b']]
+    )
 
     const inFrom = store.related('project:b')
     expect(inFrom).toHaveLength(1)
@@ -34,8 +46,10 @@ describe('store query', () => {
 
   it('should search entities by name or id', () => {
     const store = createStore()
-    store.addEntity('person:imba97', { type: 'person', name: 'imba久期' })
-    store.addEntity('project:website', { type: 'project', name: '网站重构' })
+    seedGraph(store, [
+      ['person:imba97', { type: 'person', name: 'imba久期' }],
+      ['project:website', { type: 'project', name: '网站重构' }]
+    ])
 
     const byName = store.search('久期')
     expect(byName).toHaveLength(1)
@@ -50,8 +64,10 @@ describe('store query', () => {
 
   it('should search with type filter', () => {
     const store = createStore()
-    store.addEntity('person:a', { type: 'person', name: 'Alice' })
-    store.addEntity('project:b', { type: 'project', name: 'Alice Project' })
+    seedGraph(store, [
+      ['person:a', { type: 'person', name: 'Alice' }],
+      ['project:b', { type: 'project', name: 'Alice Project' }]
+    ])
 
     const both = store.search('alice')
     expect(both).toHaveLength(2)
@@ -63,8 +79,10 @@ describe('store query', () => {
 
   it('should list entities', () => {
     const store = createStore()
-    store.addEntity('person:a', { type: 'person', name: 'Alice' })
-    store.addEntity('project:b', { type: 'project', name: 'Project B' })
+    seedGraph(store, [
+      ['person:a', { type: 'person', name: 'Alice' }],
+      ['project:b', { type: 'project', name: 'Project B' }]
+    ])
 
     const all = store.listEntities()
     expect(all).toHaveLength(2)
@@ -75,9 +93,11 @@ describe('store query', () => {
 
   it('should list types', () => {
     const store = createStore()
-    store.addEntity('person:a', { type: 'person', name: 'Alice' })
-    store.addEntity('project:b', { type: 'project', name: 'Project B' })
-    store.addEntity('task:c', { type: 'task', name: 'Task C' })
+    seedGraph(store, [
+      ['person:a', { type: 'person', name: 'Alice' }],
+      ['project:b', { type: 'project', name: 'Project B' }],
+      ['task:c', { type: 'task', name: 'Task C' }]
+    ])
 
     const types = store.listTypes()
     expect(types).toEqual(['person', 'project', 'task'])

@@ -1,12 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import { createStore } from './helpers'
+import { createStore, seedGraph } from './helpers'
+
+interface InvalidRelationCase {
+  name: string
+  entities: Array<[string, { type: string, name: string }]>
+  relation: [string, string, string]
+  message: string
+}
 
 describe('store relation', () => {
   it('should add and query relations', () => {
     const store = createStore()
-    store.addEntity('person:a', { type: 'person', name: 'Alice' })
-    store.addEntity('project:b', { type: 'project', name: 'Project B' })
-    store.addRelation('person:a', 'owns', 'project:b')
+    seedGraph(
+      store,
+      [
+        ['person:a', { type: 'person', name: 'Alice' }],
+        ['project:b', { type: 'project', name: 'Project B' }]
+      ],
+      [['person:a', 'owns', 'project:b']]
+    )
 
     const graph = store.getGraph()
     expect(graph.relations).toEqual([
@@ -14,37 +26,49 @@ describe('store relation', () => {
     ])
   })
 
-  it('should throw on relation with missing entity', () => {
-    const store = createStore()
-    store.addEntity('person:a', { type: 'person', name: 'Alice' })
-    expect(() => {
-      store.addRelation('person:a', 'owns', 'project:missing')
-    }).toThrow('not found')
-  })
+  const invalidCases: InvalidRelationCase[] = [
+    {
+      name: 'relation with missing entity',
+      entities: [
+        ['person:a', { type: 'person', name: 'Alice' }]
+      ],
+      relation: ['person:a', 'owns', 'project:missing'],
+      message: 'not found'
+    },
+    {
+      name: 'unknown relation type',
+      entities: [
+        ['person:a', { type: 'person', name: 'Alice' }],
+        ['project:b', { type: 'project', name: 'Project B' }]
+      ],
+      relation: ['person:a', 'friend_of', 'project:b'],
+      message: 'Unknown relation type'
+    },
+    {
+      name: 'invalid type pair for relation',
+      entities: [
+        ['person:a', { type: 'person', name: 'Alice' }],
+        ['person:b', { type: 'person', name: 'Bob' }]
+      ],
+      relation: ['person:a', 'owns', 'person:b'],
+      message: 'cannot be the target'
+    },
+    {
+      name: 'self-loop relation',
+      entities: [
+        ['person:a', { type: 'person', name: 'Alice' }]
+      ],
+      relation: ['person:a', 'owns', 'person:a'],
+      message: 'self-referencing'
+    }
+  ]
 
-  it('should reject unknown relation type', () => {
+  it.each(invalidCases)('should reject $name', ({ entities, relation, message }) => {
     const store = createStore()
-    store.addEntity('person:a', { type: 'person', name: 'Alice' })
-    store.addEntity('project:b', { type: 'project', name: 'Project B' })
+    seedGraph(store, entities)
     expect(() => {
-      store.addRelation('person:a', 'friend_of', 'project:b')
-    }).toThrow('Unknown relation type')
-  })
-
-  it('should reject invalid type pair for relation', () => {
-    const store = createStore()
-    store.addEntity('person:a', { type: 'person', name: 'Alice' })
-    store.addEntity('person:b', { type: 'person', name: 'Bob' })
-    expect(() => {
-      store.addRelation('person:a', 'owns', 'person:b')
-    }).toThrow('cannot be the target')
-  })
-
-  it('should reject self-loop relation', () => {
-    const store = createStore()
-    store.addEntity('person:a', { type: 'person', name: 'Alice' })
-    expect(() => {
-      store.addRelation('person:a', 'owns', 'person:a')
-    }).toThrow('self-referencing')
+      const [from, rel, to] = relation
+      store.addRelation(from, rel, to)
+    }).toThrow(message)
   })
 })

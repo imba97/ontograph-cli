@@ -19,6 +19,10 @@ type EntityIndex = Record<string, string[]>
 
 // Adjacency list for O(1) neighbor lookup
 type AdjacencyList = Record<string, Array<{ rel: string, neighbor: string }>>
+interface AdjacencyIndex {
+  out: AdjacencyList
+  in: AdjacencyList
+}
 const STORE_PATHS = {
   index: 'index.yaml',
   relations: 'relations.yaml',
@@ -30,7 +34,7 @@ export class OntologyStore {
 
   // Cached views
   #graph: Graph | null = null
-  #adj: AdjacencyList | null = null
+  #adj: AdjacencyIndex | null = null
   #warned = new Set<string>()
 
   constructor(options: StoreOptions) {
@@ -98,22 +102,33 @@ export class OntologyStore {
     this.#writeYamlAtomic(this.#indexPath(), { entities: index })
   }
 
+  #updateIndex(mutator: (index: EntityIndex) => void): void {
+    const index = this.#loadIndex()
+    mutator(index)
+    this.#saveIndex(index)
+  }
+
   // ── Adjacency list ───────────────────────────────────────────────────────────
 
-  /** Build adjacency list from relations (or return cached). */
-  #getAdj(): AdjacencyList {
+  /** Build adjacency index from relations (or return cached). */
+  #getAdj(): AdjacencyIndex {
     if (this.#adj)
       return this.#adj
 
     const graph = this.load()
-    const adj: AdjacencyList = {}
+    const out: AdjacencyList = {}
+    const incoming: AdjacencyList = {}
     for (const r of graph.relations) {
-      if (!adj[r.from])
-        adj[r.from] = []
-      adj[r.from].push({ rel: r.rel, neighbor: r.to })
+      if (!out[r.from])
+        out[r.from] = []
+      out[r.from].push({ rel: r.rel, neighbor: r.to })
+
+      if (!incoming[r.to])
+        incoming[r.to] = []
+      incoming[r.to].push({ rel: r.rel, neighbor: r.from })
     }
-    this.#adj = adj
-    return adj
+    this.#adj = { out, in: incoming }
+    return this.#adj
   }
 
   /** Invalidate caches. Call after any write operation. */
@@ -195,12 +210,12 @@ export class OntologyStore {
     fs.writeFileSync(filePath, yaml.stringify(entity), 'utf8')
 
     // Incrementally update index
-    const index = this.#loadIndex()
-    if (!index[type])
-      index[type] = []
-    if (!index[type].includes(id))
-      index[type].push(id)
-    this.#saveIndex(index)
+    this.#updateIndex((index) => {
+      if (!index[type])
+        index[type] = []
+      if (!index[type].includes(id))
+        index[type].push(id)
+    })
 
     this.#invalidate()
   }
@@ -217,10 +232,13 @@ export class OntologyStore {
       fs.unlinkSync(filePath)
 
     // Incrementally update index
-    const index = this.#loadIndex()
-    if (index[type])
+    this.#updateIndex((index) => {
+      if (!index[type])
+        return
       index[type] = index[type].filter(i => i !== id)
-    this.#saveIndex(index)
+      if (index[type].length === 0)
+        delete index[type]
+    })
 
     // Remove relations involving this entity
     this.#saveRelations(graph.relations.filter(r => r.from !== fullId && r.to !== fullId))
@@ -273,19 +291,15 @@ export class OntologyStore {
     const results: RelatedResult[] = []
 
     // Outgoing
-    for (const { rel: r, neighbor } of adj[id] ?? []) {
+    for (const { rel: r, neighbor } of adj.out[id] ?? []) {
       if (!rel || rel === r)
         results.push({ id: neighbor, entity: graph.entities[neighbor]!, rel: r, direction: 'out' })
     }
 
-    // Incoming — scan adj for edges pointing TO id
-    for (const [from, edges] of Object.entries(adj)) {
-      if (from === id)
-        continue
-      for (const { rel: r, neighbor } of edges) {
-        if (neighbor === id && (!rel || rel === r))
-          results.push({ id: from, entity: graph.entities[from]!, rel: r, direction: 'in' })
-      }
+    // Incoming
+    for (const { rel: r, neighbor } of adj.in[id] ?? []) {
+      if (!rel || rel === r)
+        results.push({ id: neighbor, entity: graph.entities[neighbor]!, rel: r, direction: 'in' })
     }
 
     return results
@@ -333,12 +347,14 @@ export class OntologyStore {
     const adj = this.#getAdj()
     interface Frame { id: string, path: string[] }
     const queue: Frame[] = [{ id: from, path: [from] }]
+    let queueHead = 0
     const visited = new Set<string>([from])
 
-    while (queue.length > 0) {
-      const frame = queue.shift()!
+    while (queueHead < queue.length) {
+      const frame = queue[queueHead]!
+      queueHead += 1
 
-      for (const { rel: _rel, neighbor } of adj[frame.id] ?? []) {
+      for (const { rel: _rel, neighbor } of adj.out[frame.id] ?? []) {
         if (visited.has(neighbor))
           continue
 
@@ -349,7 +365,7 @@ export class OntologyStore {
           for (let i = 1; i < newPath.length; i++) {
             const prev = newPath[i - 1]
             const curr = newPath[i]
-            const relEntry = adj[prev]?.find(n => n.neighbor === curr)
+            const relEntry = adj.out[prev]?.find(n => n.neighbor === curr)
             if (relEntry)
               pathRelations.push({ from: prev, rel: relEntry.rel, to: curr })
           }

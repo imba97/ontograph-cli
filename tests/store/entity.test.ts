@@ -2,12 +2,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { OntologyStore } from '../../src/store'
-import { createStore } from './helpers'
+import { createStore, seedGraph } from './helpers'
 
 describe('store entity', () => {
   it('should add and retrieve entities', () => {
     const store = createStore()
-    store.addEntity('person:test', { type: 'person', name: 'Test User' })
+    seedGraph(store, [['person:test', { type: 'person', name: 'Test User' }]])
 
     const graph = store.getGraph()
     expect(graph.entities['person:test']).toEqual({ type: 'person', name: 'Test User' })
@@ -42,9 +42,14 @@ describe('store entity', () => {
 
   it('should remove entity and cascading relations', () => {
     const store = createStore()
-    store.addEntity('person:a', { type: 'person', name: 'Alice' })
-    store.addEntity('project:b', { type: 'project', name: 'Project B' })
-    store.addRelation('person:a', 'owns', 'project:b')
+    seedGraph(
+      store,
+      [
+        ['person:a', { type: 'person', name: 'Alice' }],
+        ['project:b', { type: 'project', name: 'Project B' }]
+      ],
+      [['person:a', 'owns', 'project:b']]
+    )
 
     store.removeEntity('person:a')
 
@@ -55,8 +60,10 @@ describe('store entity', () => {
 
   it('should skip missing and malformed indexed entity files', () => {
     const store = createStore()
-    store.addEntity('person:missing', { type: 'person', name: 'Missing User' })
-    store.addEntity('person:broken', { type: 'person', name: 'Broken User' })
+    seedGraph(store, [
+      ['person:missing', { type: 'person', name: 'Missing User' }],
+      ['person:broken', { type: 'person', name: 'Broken User' }]
+    ])
 
     const dataDir = store.getDataDir()
     const missingPath = path.join(dataDir, 'entities', 'person', 'missing.yaml')
