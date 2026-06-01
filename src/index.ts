@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import process from 'node:process'
 import { cac } from 'cac'
 import { consola } from 'consola'
@@ -30,6 +31,9 @@ import {
 import { entityUpdate } from './commands/update'
 import { OntologyStore } from './store'
 import { getDefaultDataDir, normalizeOptionList } from './utils'
+
+const require = createRequire(import.meta.url)
+const { version } = require('../package.json') as { version: string }
 
 interface GlobalOptions {
   dataDir?: string
@@ -290,7 +294,7 @@ cli
   })
 
 cli.help()
-cli.version('0.1.0')
+cli.version(version)
 
 try {
   cli.parse()
