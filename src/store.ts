@@ -14,7 +14,12 @@ import path from 'node:path'
 import { consola } from 'consola'
 import yaml from 'yaml'
 import { buildEntityId, parseEntityId } from './utils'
-import { getPresetArrayFields, validateEntity, validateRelation } from './validator'
+import {
+  getPresetArrayFields,
+  validateEntity,
+  validateEntityByUserSchema,
+  validateRelation
+} from './validator'
 
 type EntityIndex = Record<string, string[]>
 
@@ -213,6 +218,11 @@ export class OntologyStore {
       const msgs = errors.map(e => `[${e.field}] ${e.message}`).join('; ')
       throw new Error(`Validation failed: ${msgs}`)
     }
+    const customErrors = this.validateCustomEntity(entity.type, entity)
+    if (customErrors.length > 0) {
+      const msgs = customErrors.map(e => `[${e.field}] ${e.message}`).join('; ')
+      throw new Error(`Validation failed: ${msgs}`)
+    }
 
     const filePath = this.entityPath(type, id)
     fs.mkdirSync(path.dirname(filePath), { recursive: true })
@@ -249,6 +259,11 @@ export class OntologyStore {
     const errors = validateEntity(merged.type, merged)
     if (errors.length > 0) {
       const msgs = errors.map(e => `[${e.field}] ${e.message}`).join('; ')
+      throw new Error(`Validation failed: ${msgs}`)
+    }
+    const customErrors = this.validateCustomEntity(merged.type, merged)
+    if (customErrors.length > 0) {
+      const msgs = customErrors.map(e => `[${e.field}] ${e.message}`).join('; ')
       throw new Error(`Validation failed: ${msgs}`)
     }
 
@@ -462,20 +477,30 @@ export class OntologyStore {
 
   getArrayFieldsForType(type: string): Set<string> {
     const arrayFields = new Set<string>(getPresetArrayFields(type))
-    const schemaPath = path.join(this.dataDir, 'user-entities', `${type}.yaml`)
-    if (!fs.existsSync(schemaPath))
-      return arrayFields
-
-    const schema = this.readYaml<UserEntitySchema>(schemaPath)
+    const schema = this.loadUserEntitySchema(type)
     if (!schema?.fields)
       return arrayFields
 
     for (const [fieldName, fieldDef] of Object.entries(schema.fields)) {
-      if (fieldDef.type.endsWith('[]'))
+      if (fieldDef.type === 'array')
         arrayFields.add(fieldName)
     }
 
     return arrayFields
+  }
+
+  getNumberFieldsForType(type: string): Set<string> {
+    const numberFields = new Set<string>()
+    const schema = this.loadUserEntitySchema(type)
+    if (!schema?.fields)
+      return numberFields
+
+    for (const [fieldName, fieldDef] of Object.entries(schema.fields)) {
+      if (fieldDef.type === 'number')
+        numberFields.add(fieldName)
+    }
+
+    return numberFields
   }
 
   // ── Internal ───────────────────────────────────────────────────────────────
@@ -487,5 +512,19 @@ export class OntologyStore {
     const entitiesDir = path.join(this.dataDir, STORE_PATHS.entitiesDir)
     if (!fs.existsSync(entitiesDir))
       fs.mkdirSync(entitiesDir, { recursive: true })
+  }
+
+  private loadUserEntitySchema(type: string): UserEntitySchema | null {
+    const schemaPath = path.join(this.dataDir, 'user-entities', `${type}.yaml`)
+    if (!fs.existsSync(schemaPath))
+      return null
+    return this.readYaml<UserEntitySchema>(schemaPath)
+  }
+
+  private validateCustomEntity(type: string, entity: Partial<Entity>) {
+    const schema = this.loadUserEntitySchema(type)
+    if (!schema)
+      return []
+    return validateEntityByUserSchema(entity, schema)
   }
 }

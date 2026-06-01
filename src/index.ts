@@ -30,7 +30,7 @@ import {
 } from './commands/relation-type'
 import { entityUpdate } from './commands/update'
 import { OntologyStore } from './store'
-import { getDefaultDataDir, normalizeOptionList } from './utils'
+import { getDefaultDataDir, normalizeOptionList, parseFieldDefinition } from './utils'
 
 const require = createRequire(import.meta.url)
 const { version } = require('../package.json') as { version: string }
@@ -182,7 +182,7 @@ cli
   .command('entity-type <action> [name]', 'Entity type management: list, view, add, update, remove')
   .option('--name <name>', 'Display name')
   .option('--desc <description>', 'Description')
-  .option('--field <fields...>', 'Field definitions (e.g. --field status:string:true)')
+  .option('--field <fields...>', 'Field definitions (e.g. --field name=status;type=string;required=true)')
   .action((action: string, name: string | undefined, options) => {
     const store = getStore(options)
     switch (action) {
@@ -198,15 +198,8 @@ cli
         if (!name)
           throw new Error('Name required for add')
         {
-          const fields = (Array.isArray(options.field) ? options.field : options.field ? [options.field] : []).map((f: string) => {
-            const parts = f.split(':')
-            return {
-              key: parts[0],
-              type: parts[1] || 'string',
-              required: parts[2] !== 'false',
-              enum: parts[3] ? parts[3].split(',') : undefined
-            }
-          })
+          const fields = (Array.isArray(options.field) ? options.field : options.field ? [options.field] : [])
+            .map((f: string) => parseFieldDefinition(f))
           entityTypeAdd(store, name, options.name || name, options.desc || '', fields)
         }
         break
@@ -220,15 +213,7 @@ cli
           throw new Error('Name required for update')
         {
           const fields = options.field
-            ? (Array.isArray(options.field) ? options.field : [options.field]).map((f: string) => {
-                const parts = f.split(':')
-                return {
-                  key: parts[0],
-                  type: parts[1] || 'string',
-                  required: parts[2] !== 'false',
-                  enum: parts[3] ? parts[3].split(',') : undefined
-                }
-              })
+            ? (Array.isArray(options.field) ? options.field : [options.field]).map((f: string) => parseFieldDefinition(f))
             : undefined
           entityTypeUpdate(store, name, options.name, options.desc, fields)
         }

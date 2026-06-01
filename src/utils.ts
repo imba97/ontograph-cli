@@ -8,7 +8,13 @@ export function getDefaultDataDir(): string {
   return path.join(hermesHome, 'data', 'ontograph-cli')
 }
 
-export type PropValue = string | string[]
+export type PropValue = string | number | string[]
+export interface ParsedFieldDef {
+  name: string
+  type: 'string' | 'number' | 'array'
+  required?: boolean
+  enum?: string[]
+}
 
 export function normalizeOptionList(value: string | string[] | undefined): string[] {
   if (!value)
@@ -16,9 +22,14 @@ export function normalizeOptionList(value: string | string[] | undefined): strin
   return Array.isArray(value) ? value : [value]
 }
 
-export function parseKeyValue(args: string[], arrayFields: Iterable<string> = []): Record<string, PropValue> {
+export function parseKeyValue(
+  args: string[],
+  arrayFields: Iterable<string> = [],
+  numberFields: Iterable<string> = []
+): Record<string, PropValue> {
   const result: Record<string, PropValue> = {}
   const arrayFieldSet = new Set(arrayFields)
+  const numberFieldSet = new Set(numberFields)
   for (const arg of args) {
     const eq = arg.indexOf('=')
     if (eq > 0 && eq < arg.length - 1) {
@@ -27,11 +38,64 @@ export function parseKeyValue(args: string[], arrayFields: Iterable<string> = []
       if (arrayFieldSet.has(key)) {
         result[key] = value.split(',').map(v => v.trim()).filter(Boolean)
       }
+      else if (numberFieldSet.has(key)) {
+        const parsed = Number(value)
+        result[key] = Number.isFinite(parsed) ? parsed : value
+      }
       else {
         result[key] = value
       }
     }
   }
+  return result
+}
+
+export function parseFieldDefinition(field: string): ParsedFieldDef {
+  const kvPairs = field.split(';').map(item => item.trim()).filter(Boolean)
+  if (kvPairs.length === 0)
+    throw new Error(`Invalid --field "${field}". Expected format: name=...;type=...`)
+
+  const parsed: Record<string, string> = {}
+  for (const pair of kvPairs) {
+    const eq = pair.indexOf('=')
+    if (eq <= 0 || eq === pair.length - 1) {
+      throw new Error(`Invalid field segment "${pair}" in "${field}". Expected key=value`)
+    }
+    const key = pair.slice(0, eq).trim()
+    const value = pair.slice(eq + 1).trim()
+    parsed[key] = value
+  }
+
+  const name = parsed.name
+  if (!name)
+    throw new Error(`Invalid --field "${field}": missing "name"`)
+
+  const type = parsed.type
+  if (!type)
+    throw new Error(`Invalid --field "${field}": missing "type"`)
+  if (type !== 'string' && type !== 'number' && type !== 'array')
+    throw new Error(`Invalid --field "${field}": type must be one of string, number, array`)
+
+  const result: ParsedFieldDef = {
+    name,
+    type
+  }
+
+  if (parsed.required !== undefined) {
+    const lowered = parsed.required.toLowerCase()
+    if (lowered !== 'true' && lowered !== 'false')
+      throw new Error(`Invalid --field "${field}": required must be true or false`)
+    if (lowered === 'true')
+      result.required = true
+  }
+
+  if (parsed.enum !== undefined) {
+    const values = parsed.enum.split(',').map(item => item.trim()).filter(Boolean)
+    if (values.length === 0)
+      throw new Error(`Invalid --field "${field}": enum must contain at least one value`)
+    result.enum = values
+  }
+
   return result
 }
 

@@ -115,7 +115,24 @@ ontograph types
 ontograph entity-type update <name> [--name <显示名>] [--desc <描述>] [--field <字段定义...>]
 ```
 
-字段定义格式与 `add` 保持一致：`fieldKey:fieldType:required:enum1,enum2`。
+字段定义（`--field`）使用 `key=value`，键值对以 `;` 分隔。
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| `name` | 是 | 字段名，如 `model` |
+| `type` | 是 | 仅支持 `string` / `number` / `array`（`array` 为字符串数组） |
+| `required` | 否 | `true` / `false`，默认 `false` |
+| `enum` | 否 | 枚举值列表（逗号分隔），设置后会在新增/更新时校验 |
+
+示例：
+
+```bash
+ontograph entity-type add ai \
+  --name "AI" \
+  --field "name=name;type=string;required=true" \
+  --field "name=model;type=array;enum=gpt-4o,claude-4" \
+  --field "name=retry_count;type=number"
+```
 
 ### `relation-type <action> [name]`
 

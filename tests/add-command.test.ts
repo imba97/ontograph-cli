@@ -19,8 +19,8 @@ describe('entity add command helper', () => {
   it('should parse custom type array field by schema', () => {
     const store = createStore()
     entityTypeAdd(store, 'book', 'Book', 'Book entity', [
-      { key: 'name', type: 'string', required: true },
-      { key: 'authors', type: 'string[]', required: false }
+      { name: 'name', type: 'string', required: true },
+      { name: 'authors', type: 'array' }
     ])
 
     entityAdd(store, 'book', 'Schema Array', ['authors=a,b'])

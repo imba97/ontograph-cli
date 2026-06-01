@@ -11,7 +11,8 @@ export function entityUpdate(
 ): void {
   const { type } = parseEntityId(fullId)
   const arrayFields = store.getArrayFieldsForType(type)
-  const extra = parseKeyValue(props, arrayFields)
+  const numberFields = store.getNumberFieldsForType(type)
+  const extra = parseKeyValue(props, arrayFields, numberFields)
   const patch: Partial<Entity> = {
     ...extra
   }

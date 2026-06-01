@@ -12,7 +12,8 @@ export function entityAdd(
   const entityId = generateEntityId(type)
   const defaultName = name || entityId
   const arrayFields = store.getArrayFieldsForType(type)
-  const extra = parseKeyValue(props, arrayFields)
+  const numberFields = store.getNumberFieldsForType(type)
+  const extra = parseKeyValue(props, arrayFields, numberFields)
 
   const entity: Entity = {
     type,

@@ -16,12 +16,12 @@ describe('custom type update commands', () => {
   it('should update user entity type definition', () => {
     const store = createStore()
     entityTypeAdd(store, 'book', 'Book', 'Book entity', [
-      { key: 'name', type: 'string', required: true }
+      { name: 'name', type: 'string', required: true }
     ])
 
     entityTypeUpdate(store, 'book', 'Book Updated', 'Updated desc', [
-      { key: 'name', type: 'string', required: true },
-      { key: 'isbn', type: 'string', required: false }
+      { name: 'name', type: 'string', required: true },
+      { name: 'isbn', type: 'string' }
     ])
 
     const schemaPath = path.join(store.getDataDir(), 'user-entities', 'book.yaml')
@@ -33,6 +33,7 @@ describe('custom type update commands', () => {
     expect(schema.name).toBe('Book Updated')
     expect(schema.description).toBe('Updated desc')
     expect(schema.fields.isbn.type).toBe('string')
+    expect(schema.fields.isbn).not.toHaveProperty('required')
   })
 
   it('should reject updating missing user entity type', () => {
@@ -52,11 +53,21 @@ describe('custom type update commands', () => {
   it('should validate entity type fields on update', () => {
     const store = createStore()
     entityTypeAdd(store, 'book', 'Book', 'Book entity', [
-      { key: 'name', type: 'string', required: true }
+      { name: 'name', type: 'string', required: true }
     ])
     expect(() => {
       entityTypeUpdate(store, 'book', undefined, undefined, [
-        { key: 'badField', type: 'custom', required: false }
+        { name: 'badField', type: 'custom' }
+      ])
+    }).toThrow('Unknown type in field')
+  })
+
+  it('should reject unsupported primitive type in field definition', () => {
+    const store = createStore()
+    expect(() => {
+      entityTypeAdd(store, 'ai', 'AI', 'AI config', [
+        { name: 'name', type: 'string', required: true },
+        { name: 'enabled', type: 'boolean' as unknown as 'string' }
       ])
     }).toThrow('Unknown type in field')
   })

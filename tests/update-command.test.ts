@@ -39,8 +39,8 @@ describe('entity update command helper', () => {
   it('should parse schema defined custom array field', () => {
     const store = createStore()
     entityTypeAdd(store, 'book', 'Book', 'Book entity', [
-      { key: 'name', type: 'string', required: true },
-      { key: 'authors', type: 'string[]', required: false }
+      { name: 'name', type: 'string', required: true },
+      { name: 'authors', type: 'array' }
     ])
     store.addEntity('book_4444dddd', { type: 'book', name: 'Book One' })
 

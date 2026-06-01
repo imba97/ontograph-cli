@@ -7,7 +7,7 @@ import yaml from 'yaml'
 import { knownTypes } from '../validator'
 
 const USER_ENTITY_DIR = 'user-entities'
-const SUPPORTED_FIELD_TYPES = new Set(['string', 'number', 'boolean', 'string[]', 'number[]', 'boolean[]'])
+const SUPPORTED_FIELD_TYPES = new Set(['string', 'number', 'array'])
 
 function getEntityDir(dataDir: string): string {
   return path.join(dataDir, USER_ENTITY_DIR)
@@ -93,7 +93,7 @@ export function entityTypeAdd(
   typeName: string,
   name: string,
   description: string,
-  fields: Array<{ key: string, type: string, required: boolean, enum?: string[] }>
+  fields: Array<{ name: string, type: string, required?: boolean, enum?: string[] }>
 ): void {
   const dataDir = store.getDataDir()
 
@@ -122,7 +122,7 @@ export function entityTypeUpdate(
   typeName: string,
   name: string | undefined,
   description: string | undefined,
-  fields?: Array<{ key: string, type: string, required: boolean, enum?: string[] }>
+  fields?: Array<{ name: string, type: string, required?: boolean, enum?: string[] }>
 ): void {
   const dataDir = store.getDataDir()
 
@@ -138,8 +138,8 @@ export function entityTypeUpdate(
   const existing = yaml.parse(raw) as UserEntitySchema
   const nextName = name ?? existing.name ?? typeName
   const nextDesc = description ?? existing.description ?? ''
-  const nextFields = fields ?? Object.entries(existing.fields ?? {}).map(([key, def]) => ({
-    key,
+  const nextFields = fields ?? Object.entries(existing.fields ?? {}).map(([fieldName, def]) => ({
+    name: fieldName,
     type: def.type,
     required: Boolean(def.required),
     enum: def.enum
@@ -176,7 +176,7 @@ function buildEntitySchema(
   dataDir: string,
   name: string,
   description: string,
-  fields: Array<{ key: string, type: string, required: boolean, enum?: string[] }>
+  fields: Array<{ name: string, type: string, required?: boolean, enum?: string[] }>
 ): UserEntitySchema {
   const allTypes = [...knownTypes, ...Object.keys(loadUserEntitySchemas(dataDir))]
 
@@ -187,14 +187,22 @@ function buildEntitySchema(
   }
 
   for (const f of fields) {
-    if (!allTypes.includes(f.key) && !SUPPORTED_FIELD_TYPES.has(f.type)) {
-      throw new Error(`Unknown type in field "${f.key}": "${f.type}". Known types: ${allTypes.join(', ')}`)
+    if (!f.name) {
+      throw new Error('Field "name" is required')
     }
-    schema.fields[f.key] = {
-      type: f.type as 'string' | 'number' | 'boolean' | 'string[]' | 'number[]' | 'boolean[]',
-      required: f.required,
-      enum: f.enum
+    if (!allTypes.includes(f.type) && !SUPPORTED_FIELD_TYPES.has(f.type)) {
+      throw new Error(`Unknown type in field "${f.name}": "${f.type}". Known types: ${allTypes.join(', ')}`)
     }
+    const normalizedEnum = f.enum?.map(v => v.trim()).filter(Boolean)
+    const fieldDef: UserEntitySchema['fields'][string] = {
+      type: f.type as 'string' | 'number' | 'array'
+    }
+    if (f.required)
+      fieldDef.required = true
+    if (normalizedEnum && normalizedEnum.length > 0)
+      fieldDef.enum = normalizedEnum
+
+    schema.fields[f.name] = fieldDef
   }
 
   if (!schema.fields.name)

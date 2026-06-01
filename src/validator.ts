@@ -1,4 +1,4 @@
-import type { Entity } from './types'
+import type { Entity, UserEntitySchema } from './types'
 import { z } from 'zod'
 import {
   relationTypes,
@@ -134,6 +134,65 @@ export function validateEntity(type: string, data: Partial<Entity>): ValidationE
   }
 
   return []
+}
+
+export function validateEntityByUserSchema(
+  entity: Partial<Entity>,
+  schema: UserEntitySchema
+): ValidationError[] {
+  const errors: ValidationError[] = []
+  const fields = schema.fields ?? {}
+
+  for (const [fieldName, fieldDef] of Object.entries(fields)) {
+    const value = entity[fieldName]
+    const hasValue = value !== undefined && value !== null
+
+    if (fieldDef.required && !hasValue) {
+      errors.push({ field: fieldName, message: 'field is required' })
+      continue
+    }
+
+    if (!hasValue)
+      continue
+
+    if (fieldDef.type === 'string' && typeof value !== 'string') {
+      errors.push({ field: fieldName, message: 'must be a string' })
+      continue
+    }
+    if (fieldDef.type === 'number' && (typeof value !== 'number' || !Number.isFinite(value))) {
+      errors.push({ field: fieldName, message: 'must be a number' })
+      continue
+    }
+    if (fieldDef.type === 'array') {
+      if (!Array.isArray(value) || !value.every(item => typeof item === 'string')) {
+        errors.push({ field: fieldName, message: 'must be an array of strings' })
+        continue
+      }
+    }
+
+    if (fieldDef.enum && fieldDef.enum.length > 0) {
+      if (fieldDef.type === 'array') {
+        const invalid = (value as string[]).find(item => !fieldDef.enum!.includes(item))
+        if (invalid !== undefined) {
+          errors.push({
+            field: fieldName,
+            message: `contains value "${invalid}" outside enum: ${fieldDef.enum.join(', ')}`
+          })
+        }
+      }
+      else {
+        const candidate = String(value)
+        if (!fieldDef.enum.includes(candidate)) {
+          errors.push({
+            field: fieldName,
+            message: `must be one of: ${fieldDef.enum.join(', ')}`
+          })
+        }
+      }
+    }
+  }
+
+  return errors
 }
 
 // ── Relation Validation ──────────────────────────────────────────────────────

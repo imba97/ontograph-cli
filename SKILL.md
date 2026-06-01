@@ -87,8 +87,8 @@ ontograph related <id> [--rel <relation>]
 # Entity type
 ontograph entity-type list
 ontograph entity-type view <name>
-ontograph entity-type add <name> --name <display> --field <key:type:required:enum...>
-ontograph entity-type update <name> [--name <display>] [--desc <description>] [--field <key:type:required:enum...>]
+ontograph entity-type add <name> --name <display> --field <fieldSpec>
+ontograph entity-type update <name> [--name <display>] [--desc <description>] [--field <fieldSpec>]
 ontograph entity-type remove <name>
 
 # Relation type
@@ -97,6 +97,24 @@ ontograph relation-type view <name>
 ontograph relation-type add <name> --name <display> --from <types...> --to <types...>
 ontograph relation-type update <name> [--name <display>] [--desc <description>] [--from <types...>] [--to <types...>]
 ontograph relation-type remove <name>
+```
+
+Entity field spec (`<fieldSpec>`):
+
+- Grammar: `name=<fieldName>;type=<string|number|array>[;required=<true|false>][;enum=<v1,v2,...>]`
+- Required keys: `name`, `type`
+- Delimiters: key-value pairs use `;`, enum list uses `,`
+- Type domain: only `string`, `number`, `array` (`array` means string array)
+- Default: `required=false` when omitted, and this default is not written into YAML
+- Enum behavior: if `enum` exists, values must be within enum on entity add/update; if omitted, only type validation applies
+- Compatibility: old colon format (`field:type:required:...`) is removed
+
+Examples:
+
+```bash
+--field "name=name;type=string;required=true"
+--field "name=model;type=array;enum=gpt-4o,claude-4"
+--field "name=retry_count;type=number"
 ```
 
 `update` for custom types uses force apply behavior and does not perform backward compatibility checks on existing data.

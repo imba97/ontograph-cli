@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { consola } from 'consola'
 import { describe, expect, it, vi } from 'vitest'
+import { entityTypeAdd } from '../../src/commands/entity-type'
 import { OntologyStore } from '../../src/store'
 import { createStore, seedGraph } from './helpers'
 
@@ -98,6 +99,53 @@ describe('store entity', () => {
     expect(() => {
       store.updateEntity('project_ccccdddd', { status: 'invalid-status' })
     }).toThrow('Validation failed')
+  })
+
+  it('should validate custom required/type/enum rules on add', () => {
+    const store = createStore()
+    entityTypeAdd(store, 'ai', 'AI', 'AI config', [
+      { name: 'name', type: 'string', required: true },
+      { name: 'model', type: 'array', required: true, enum: ['gpt-4o', 'claude-4'] },
+      { name: 'retry_count', type: 'number' }
+    ])
+
+    expect(() => {
+      store.addEntity('ai_abcddcba', { type: 'ai', name: 'Agent One' })
+    }).toThrow('[model] field is required')
+
+    expect(() => {
+      store.addEntity('ai_abcddcbb', {
+        type: 'ai',
+        name: 'Agent Two',
+        model: ['gpt-4o', 'unknown']
+      })
+    }).toThrow('outside enum')
+
+    expect(() => {
+      store.addEntity('ai_abcddcbc', {
+        type: 'ai',
+        name: 'Agent Three',
+        model: ['gpt-4o'],
+        retry_count: '3'
+      })
+    }).toThrow('[retry_count] must be a number')
+  })
+
+  it('should validate custom enum rules on update', () => {
+    const store = createStore()
+    entityTypeAdd(store, 'ai', 'AI', 'AI config', [
+      { name: 'name', type: 'string', required: true },
+      { name: 'api_type', type: 'string', enum: ['openai', 'anthropic'] }
+    ])
+    store.addEntity('ai_abcddcbd', {
+      type: 'ai',
+      name: 'Agent Four',
+      api_type: 'openai'
+    })
+
+    expect(() => {
+      store.updateEntity('ai_abcddcbd', { api_type: 'other' })
+    }).toThrow('[api_type] must be one of')
   })
 
   it('should reject changing entity type during update', () => {

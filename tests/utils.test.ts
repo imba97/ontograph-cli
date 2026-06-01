@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeOptionList, parseKeyValue } from '../src/utils'
+import { normalizeOptionList, parseFieldDefinition, parseKeyValue } from '../src/utils'
 
 describe('parseKeyValue', () => {
   it('should parse normal properties as string', () => {
@@ -23,6 +23,13 @@ describe('parseKeyValue', () => {
       owner: 'a,b'
     })
   })
+
+  it('should parse number fields to number', () => {
+    const parsed = parseKeyValue(['retry=3'], [], ['retry'])
+    expect(parsed).toEqual({
+      retry: 3
+    })
+  })
 })
 
 describe('normalizeOptionList', () => {
@@ -36,5 +43,28 @@ describe('normalizeOptionList', () => {
 
   it('should keep array input as is', () => {
     expect(normalizeOptionList(['a', 'b'])).toEqual(['a', 'b'])
+  })
+})
+
+describe('parseFieldDefinition', () => {
+  it('should parse semicolon separated field config', () => {
+    expect(parseFieldDefinition('name=model;type=array;required=true;enum=a,b')).toEqual({
+      name: 'model',
+      type: 'array',
+      required: true,
+      enum: ['a', 'b']
+    })
+  })
+
+  it('should default required to false by omission', () => {
+    expect(parseFieldDefinition('name=api_key;type=string')).toEqual({
+      name: 'api_key',
+      type: 'string'
+    })
+  })
+
+  it('should throw when name or type missing', () => {
+    expect(() => parseFieldDefinition('type=string')).toThrow('missing "name"')
+    expect(() => parseFieldDefinition('name=api_key')).toThrow('missing "type"')
   })
 })
