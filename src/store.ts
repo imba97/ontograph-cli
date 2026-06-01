@@ -7,7 +7,8 @@ import type {
   Relation,
   SearchResult,
   StoreOptions,
-  UserEntitySchema
+  UserEntitySchema,
+  UserRelationSchema
 } from './types'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -304,8 +305,9 @@ export class OntologyStore {
     parseEntityId(from)
     parseEntityId(to)
     const graph = this.load()
+    const userRelationSchemas = this.loadUserRelationSchemas()
 
-    const error = validateRelation(from, to, rel, graph)
+    const error = validateRelation(from, to, rel, graph, userRelationSchemas)
     if (error)
       throw new Error(error.message)
 
@@ -519,6 +521,30 @@ export class OntologyStore {
     if (!fs.existsSync(schemaPath))
       return null
     return this.readYaml<UserEntitySchema>(schemaPath)
+  }
+
+  private loadUserRelationSchemas(): Record<string, UserRelationSchema> {
+    const relationDir = path.join(this.dataDir, 'user-relations')
+    if (!fs.existsSync(relationDir))
+      return {}
+
+    const schemas: Record<string, UserRelationSchema> = {}
+    for (const file of fs.readdirSync(relationDir)) {
+      if (!file.endsWith('.yaml'))
+        continue
+
+      const schemaPath = path.join(relationDir, file)
+      const parsed = this.readYaml<UserRelationSchema>(schemaPath)
+      if (!parsed || !Array.isArray(parsed.fromTypes) || !Array.isArray(parsed.toTypes)) {
+        this.warnOnce(`bad-user-relation:${schemaPath}`, `Malformed user relation YAML, skipped: ${schemaPath}`)
+        continue
+      }
+
+      const relName = file.replace(/\.yaml$/, '')
+      schemas[relName] = parsed
+    }
+
+    return schemas
   }
 
   private validateCustomEntity(type: string, entity: Partial<Entity>) {

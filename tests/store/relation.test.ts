@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { relationTypeAdd } from '../../src/commands/relation-type'
 import { createStore, seedGraph } from './helpers'
 
 interface InvalidRelationCase {
@@ -24,6 +25,40 @@ describe('store relation', () => {
     expect(graph.relations).toEqual([
       { from: 'person_1111aaaa', rel: 'owns', to: 'project_2222bbbb' }
     ])
+  })
+
+  it('should allow custom relation type for addRelation', () => {
+    const store = createStore()
+    relationTypeAdd(store, 'has_project', 'Has project', 'Custom relation', ['person'], ['project'])
+    seedGraph(
+      store,
+      [
+        ['person_aaaa1111', { type: 'person', name: 'Alice' }],
+        ['project_bbbb2222', { type: 'project', name: 'Project B' }]
+      ]
+    )
+
+    store.addRelation('person_aaaa1111', 'has_project', 'project_bbbb2222')
+
+    expect(store.getGraph().relations).toEqual([
+      { from: 'person_aaaa1111', rel: 'has_project', to: 'project_bbbb2222' }
+    ])
+  })
+
+  it('should reject invalid type pair for custom relation type', () => {
+    const store = createStore()
+    relationTypeAdd(store, 'has_project', 'Has project', 'Custom relation', ['person'], ['project'])
+    seedGraph(
+      store,
+      [
+        ['task_aaaa1111', { type: 'task', name: 'Task A' }],
+        ['project_bbbb2222', { type: 'project', name: 'Project B' }]
+      ]
+    )
+
+    expect(() => {
+      store.addRelation('task_aaaa1111', 'has_project', 'project_bbbb2222')
+    }).toThrow('cannot use relation')
   })
 
   const invalidCases: InvalidRelationCase[] = [

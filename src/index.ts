@@ -17,8 +17,7 @@ import {
   entityQuery,
   entityRelated,
   entitySearch,
-  entityTypes,
-  printRelationTypes
+  entityTypes
 } from './commands/query'
 import { entityRelate, entityUnrelate } from './commands/relate'
 import {
@@ -98,8 +97,9 @@ cli
 
 cli
   .command('relations', 'List all available relation types')
-  .action((_options) => {
-    printRelationTypes()
+  .action((options) => {
+    const store = getStore(options)
+    relationTypeList(store)
   })
 
 // ── Query Commands ─────────────────────────────────────────────────────────

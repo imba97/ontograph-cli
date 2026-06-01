@@ -1,4 +1,4 @@
-import type { Entity, UserEntitySchema } from './types'
+import type { Entity, UserEntitySchema, UserRelationSchema } from './types'
 import { z } from 'zod'
 import {
   relationTypes,
@@ -201,7 +201,8 @@ export function validateRelation(
   fromId: string,
   toId: string,
   rel: string,
-  graph: { entities: Record<string, Entity>, relations: { from: string, rel: string, to: string }[] }
+  graph: { entities: Record<string, Entity>, relations: { from: string, rel: string, to: string }[] },
+  userRelationSchemas: Record<string, UserRelationSchema> = {}
 ): RelationValidationError | null {
   try {
     parseEntityId(fromId)
@@ -225,14 +226,22 @@ export function validateRelation(
     return { code: 'ENTITY_NOT_FOUND', message: `Target entity "${toId}" not found` }
   }
 
-  if (!(rel in relationTypes)) {
+  const relationDefs: Record<string, { fromTypes: string[], toTypes: string[] }> = {
+    ...relationTypes,
+    ...Object.fromEntries(Object.entries(userRelationSchemas).map(([name, schema]) => [
+      name,
+      { fromTypes: schema.fromTypes, toTypes: schema.toTypes }
+    ]))
+  }
+
+  if (!(rel in relationDefs)) {
     return {
       code: 'INVALID_RELATION',
-      message: `Unknown relation type "${rel}". Known: ${Object.keys(relationTypes).join(', ')}`
+      message: `Unknown relation type "${rel}". Known: ${Object.keys(relationDefs).sort().join(', ')}`
     }
   }
 
-  const def = relationTypes[rel]
+  const def = relationDefs[rel]
   const fromType = graph.entities[fromId].type
   const toType = graph.entities[toId].type
 
