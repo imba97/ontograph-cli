@@ -14,17 +14,17 @@ pnpx skills add imba97/ontograph-cli -g -a your-agent
 
 ```bash
 # 添加实体
-ontograph add person imba97 --name "imba久期" --prop timezone=+8
-ontograph add project website --name "网站重构" --prop status=active
+ontograph add person --name "imba久期" --prop timezone=+8
+ontograph add project --name "网站重构" --prop status=active
 
 # 更新实体
-ontograph update person:imba97 --name "imba97" --prop timezone=+9
+ontograph update person_62c0841a --name "imba97" --prop timezone=+9
 
 # 建立关系
-ontograph relate person:imba97 owns project:website
+ontograph relate person_62c0841a owns project_8f2b44cd
 
 # 查询
-ontograph related person:imba97
+ontograph related person_62c0841a
 ontograph search 久期
 
 # 列表
@@ -34,12 +34,12 @@ ontograph types
 
 ## 命令参考
 
-### `add <type> <id>`
+### `add <type>`
 
 添加实体。
 
 ```bash
-ontograph add <type> <id> --name <名称> [--prop key=value ...]
+ontograph add <type> [--name <名称>] [--prop key=value ...]
 ```
 
 ### `update <id>`
@@ -132,21 +132,17 @@ ontograph relation-type update <name> [--name <显示名>] [--desc <描述>] [--
 
 ### 实体 (Entity)
 
-一切皆实体——人物、项目、任务、标签……实体由类型和 ID 唯一标识，支持自定义属性。
+一切皆实体——人物、项目、任务、标签……实体由类型前缀加自动生成 ID 唯一标识，支持自定义属性。
 
-```
-person:imba97  →  name: "imba久期", timezone: "+8"
-project:website →  name: "网站重构", status: "active"
-```
+`person_62c0841a  →  name: "imba久期", timezone: "+8"`  
+`project_8f2b44cd →  name: "网站重构", status: "active"`
 
 ### 关系 (Relation)
 
 实体之间的有向关联。
 
-```
-person:imba97 --owns--> project:website
-project:website --has_task--> task:design
-```
+`person_62c0841a --owns--> project_8f2b44cd`  
+`project_8f2b44cd --has_task--> task_c9d1a2ef`
 
 ## 数据存储
 

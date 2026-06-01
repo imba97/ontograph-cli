@@ -16,8 +16,8 @@ metadata:
 ## Core Concepts
 
 ```
-[person:imba97] --owns--> [project:blog]
-[project:blog] --has_task--> [task:rewrite]
+[person_62c0841a] --owns--> [project_8f2b44cd]
+[project_8f2b44cd] --has_task--> [task_c9d1a2ef]
 ```
 
 - **Entity**: a typed object — person, project, task, event, document, etc.
@@ -44,7 +44,7 @@ metadata:
 ### Add Entity
 
 ```bash
-ontograph add <type> <id> --name <name> [--prop key=value ...]
+ontograph add <type> [--name <name>] [--prop key=value ...]
 ```
 
 ### Remove Entity

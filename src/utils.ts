@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
@@ -39,16 +40,50 @@ export interface ParsedEntityId {
   id: string
 }
 
+const TYPE_PATTERN = /^[a-z][\w-]*$/i
+const GENERATED_ID_PATTERN = /^[a-f0-9]{8,}$/i
+
+export function assertEntityType(type: string): string {
+  const normalized = type.trim()
+  if (!TYPE_PATTERN.test(normalized)) {
+    throw new Error(
+      `Invalid entity type "${type}". Expected pattern: letters/numbers/_/- and must start with a letter`
+    )
+  }
+  return normalized
+}
+
+export function buildEntityId(type: string, id: string): string {
+  const normalizedType = assertEntityType(type)
+  if (!GENERATED_ID_PATTERN.test(id)) {
+    throw new Error(`Invalid generated id segment "${id}"`)
+  }
+  return `${normalizedType}_${id}`
+}
+
+export function generateEntityId(type: string): string {
+  const normalizedType = assertEntityType(type)
+  const segment = randomUUID().replaceAll('-', '').slice(0, 12)
+  return `${normalizedType}_${segment}`
+}
+
 /**
- * Parse "type:id" into { type, id }.
- * Throws if the id has no type prefix (no colon).
+ * Parse "type_random" into { type, id }.
  */
-export function parseEntityId(fullId: string): ParsedEntityId {
-  const colon = fullId.indexOf(':')
-  if (colon === -1)
-    throw new Error(`Invalid entity id "${fullId}": missing type prefix (expected "type:id")`)
+export function parseEntityId(entityId: string): ParsedEntityId {
+  const separator = entityId.lastIndexOf('_')
+  if (separator <= 0 || separator === entityId.length - 1) {
+    throw new Error(
+      `Invalid entity id "${entityId}". Expected generated id format: "type_randomhex"`
+    )
+  }
+  const type = entityId.slice(0, separator)
+  const id = entityId.slice(separator + 1)
+  assertEntityType(type)
+  if (!GENERATED_ID_PATTERN.test(id))
+    throw new Error(`Invalid entity id "${entityId}". Expected generated suffix of at least 8 hex characters`)
   return {
-    type: fullId.slice(0, colon),
-    id: fullId.slice(colon + 1)
+    type,
+    id
   }
 }

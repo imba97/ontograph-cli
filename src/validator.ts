@@ -7,6 +7,7 @@ import {
   VALID_STATUSES_PROJECT,
   VALID_STATUSES_TASK
 } from './schema'
+import { parseEntityId } from './utils'
 
 // ── Entity Validation Schemas ─────────────────────────────────────────────────
 
@@ -99,7 +100,7 @@ export interface ValidationError {
 }
 
 export interface RelationValidationError {
-  code: 'ENTITY_NOT_FOUND' | 'INVALID_RELATION' | 'INVALID_TYPE_PAIR' | 'SELF_LOOP'
+  code: 'ENTITY_NOT_FOUND' | 'INVALID_ENTITY_ID' | 'INVALID_RELATION' | 'INVALID_TYPE_PAIR' | 'SELF_LOOP'
   message: string
 }
 
@@ -143,6 +144,17 @@ export function validateRelation(
   rel: string,
   graph: { entities: Record<string, Entity>, relations: { from: string, rel: string, to: string }[] }
 ): RelationValidationError | null {
+  try {
+    parseEntityId(fromId)
+    parseEntityId(toId)
+  }
+  catch (error) {
+    return {
+      code: 'INVALID_ENTITY_ID',
+      message: error instanceof Error ? error.message : 'Invalid entity id'
+    }
+  }
+
   if (fromId === toId) {
     return { code: 'SELF_LOOP', message: `Cannot create self-referencing relation: ${fromId}` }
   }

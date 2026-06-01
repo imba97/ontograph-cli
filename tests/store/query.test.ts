@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import fs from 'node:fs'
+import path from 'node:path'
+import { consola } from 'consola'
+import { describe, expect, it, vi } from 'vitest'
+import { OntologyStore } from '../../src/store'
 import { createStore, seedGraph } from './helpers'
 
 describe('store query', () => {
@@ -7,23 +11,23 @@ describe('store query', () => {
     seedGraph(
       store,
       [
-        ['person:a', { type: 'person', name: 'Alice' }],
-        ['project:b', { type: 'project', name: 'Project B' }],
-        ['project:c', { type: 'project', name: 'Project C' }]
+        ['person_1111aaaa', { type: 'person', name: 'Alice' }],
+        ['project_2222bbbb', { type: 'project', name: 'Project B' }],
+        ['project_3333cccc', { type: 'project', name: 'Project C' }]
       ],
       [
-        ['person:a', 'owns', 'project:b'],
-        ['person:a', 'owns', 'project:c']
+        ['person_1111aaaa', 'owns', 'project_2222bbbb'],
+        ['person_1111aaaa', 'owns', 'project_3333cccc']
       ]
     )
 
-    const out = store.related('person:a')
+    const out = store.related('person_1111aaaa')
     expect(out).toHaveLength(2)
 
-    const byRel = store.related('person:a', 'owns')
+    const byRel = store.related('person_1111aaaa', 'owns')
     expect(byRel).toHaveLength(2)
 
-    const filtered = store.related('person:a', 'contributes')
+    const filtered = store.related('person_1111aaaa', 'contributes')
     expect(filtered).toHaveLength(0)
   })
 
@@ -32,13 +36,13 @@ describe('store query', () => {
     seedGraph(
       store,
       [
-        ['person:a', { type: 'person', name: 'Alice' }],
-        ['project:b', { type: 'project', name: 'Project B' }]
+        ['person_4444dddd', { type: 'person', name: 'Alice' }],
+        ['project_5555eeee', { type: 'project', name: 'Project B' }]
       ],
-      [['person:a', 'owns', 'project:b']]
+      [['person_4444dddd', 'owns', 'project_5555eeee']]
     )
 
-    const inFrom = store.related('project:b')
+    const inFrom = store.related('project_5555eeee')
     expect(inFrom).toHaveLength(1)
     expect(inFrom[0].direction).toBe('in')
     expect(inFrom[0].rel).toBe('owns')
@@ -47,15 +51,15 @@ describe('store query', () => {
   it('should search entities by name or id', () => {
     const store = createStore()
     seedGraph(store, [
-      ['person:imba97', { type: 'person', name: 'imba久期' }],
-      ['project:website', { type: 'project', name: '网站重构' }]
+      ['person_abcd1234', { type: 'person', name: 'imba久期' }],
+      ['project_efab5678', { type: 'project', name: '网站重构' }]
     ])
 
     const byName = store.search('久期')
     expect(byName).toHaveLength(1)
-    expect(byName[0].id).toBe('person:imba97')
+    expect(byName[0].id).toBe('person_abcd1234')
 
-    const byId = store.search('imba97')
+    const byId = store.search('abcd1234')
     expect(byId).toHaveLength(1)
 
     const noMatch = store.search('nonexistent')
@@ -65,8 +69,8 @@ describe('store query', () => {
   it('should search with type filter', () => {
     const store = createStore()
     seedGraph(store, [
-      ['person:a', { type: 'person', name: 'Alice' }],
-      ['project:b', { type: 'project', name: 'Alice Project' }]
+      ['person_6666ffff', { type: 'person', name: 'Alice' }],
+      ['project_7777aaaa', { type: 'project', name: 'Alice Project' }]
     ])
 
     const both = store.search('alice')
@@ -74,14 +78,14 @@ describe('store query', () => {
 
     const personsOnly = store.search('alice', 'person')
     expect(personsOnly).toHaveLength(1)
-    expect(personsOnly[0].id).toBe('person:a')
+    expect(personsOnly[0].id).toBe('person_6666ffff')
   })
 
   it('should list entities', () => {
     const store = createStore()
     seedGraph(store, [
-      ['person:a', { type: 'person', name: 'Alice' }],
-      ['project:b', { type: 'project', name: 'Project B' }]
+      ['person_8888bbbb', { type: 'person', name: 'Alice' }],
+      ['project_9999cccc', { type: 'project', name: 'Project B' }]
     ])
 
     const all = store.listEntities()
@@ -94,12 +98,38 @@ describe('store query', () => {
   it('should list types', () => {
     const store = createStore()
     seedGraph(store, [
-      ['person:a', { type: 'person', name: 'Alice' }],
-      ['project:b', { type: 'project', name: 'Project B' }],
-      ['task:c', { type: 'task', name: 'Task C' }]
+      ['person_aaaabbbb', { type: 'person', name: 'Alice' }],
+      ['project_bbbbcccc', { type: 'project', name: 'Project B' }],
+      ['task_ccccdddd', { type: 'task', name: 'Task C' }]
     ])
 
     const types = store.listTypes()
     expect(types).toEqual(['person', 'project', 'task'])
+  })
+
+  it('should skip relations pointing to missing entity files', () => {
+    const store = createStore()
+    seedGraph(
+      store,
+      [
+        ['person_eeeeffff', { type: 'person', name: 'Owner' }],
+        ['project_ddddeeee', { type: 'project', name: 'Broken Target' }]
+      ],
+      [['person_eeeeffff', 'owns', 'project_ddddeeee']]
+    )
+
+    const dataDir = store.getDataDir()
+    const missingPath = path.join(dataDir, 'entities', 'project', 'ddddeeee.yaml')
+    fs.unlinkSync(missingPath)
+
+    const warnSpy = vi.spyOn(consola, 'warn').mockImplementation(() => {})
+    try {
+      const reloaded = new OntologyStore({ dataDir })
+      expect(reloaded.related('person_eeeeffff')).toEqual([])
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Skipping relation with missing entity'))
+    }
+    finally {
+      warnSpy.mockRestore()
+    }
   })
 })

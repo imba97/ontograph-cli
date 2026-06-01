@@ -14,15 +14,15 @@ describe('store relation', () => {
     seedGraph(
       store,
       [
-        ['person:a', { type: 'person', name: 'Alice' }],
-        ['project:b', { type: 'project', name: 'Project B' }]
+        ['person_1111aaaa', { type: 'person', name: 'Alice' }],
+        ['project_2222bbbb', { type: 'project', name: 'Project B' }]
       ],
-      [['person:a', 'owns', 'project:b']]
+      [['person_1111aaaa', 'owns', 'project_2222bbbb']]
     )
 
     const graph = store.getGraph()
     expect(graph.relations).toEqual([
-      { from: 'person:a', rel: 'owns', to: 'project:b' }
+      { from: 'person_1111aaaa', rel: 'owns', to: 'project_2222bbbb' }
     ])
   })
 
@@ -30,36 +30,45 @@ describe('store relation', () => {
     {
       name: 'relation with missing entity',
       entities: [
-        ['person:a', { type: 'person', name: 'Alice' }]
+        ['person_3333cccc', { type: 'person', name: 'Alice' }]
       ],
-      relation: ['person:a', 'owns', 'project:missing'],
+      relation: ['person_3333cccc', 'owns', 'project_4444dddd'],
       message: 'not found'
     },
     {
       name: 'unknown relation type',
       entities: [
-        ['person:a', { type: 'person', name: 'Alice' }],
-        ['project:b', { type: 'project', name: 'Project B' }]
+        ['person_5555eeee', { type: 'person', name: 'Alice' }],
+        ['project_6666ffff', { type: 'project', name: 'Project B' }]
       ],
-      relation: ['person:a', 'friend_of', 'project:b'],
+      relation: ['person_5555eeee', 'friend_of', 'project_6666ffff'],
       message: 'Unknown relation type'
     },
     {
       name: 'invalid type pair for relation',
       entities: [
-        ['person:a', { type: 'person', name: 'Alice' }],
-        ['person:b', { type: 'person', name: 'Bob' }]
+        ['person_7777aaaa', { type: 'person', name: 'Alice' }],
+        ['person_8888bbbb', { type: 'person', name: 'Bob' }]
       ],
-      relation: ['person:a', 'owns', 'person:b'],
+      relation: ['person_7777aaaa', 'owns', 'person_8888bbbb'],
       message: 'cannot be the target'
     },
     {
       name: 'self-loop relation',
       entities: [
-        ['person:a', { type: 'person', name: 'Alice' }]
+        ['person_9999cccc', { type: 'person', name: 'Alice' }]
       ],
-      relation: ['person:a', 'owns', 'person:a'],
+      relation: ['person_9999cccc', 'owns', 'person_9999cccc'],
       message: 'self-referencing'
+    },
+    {
+      name: 'legacy entity id format',
+      entities: [
+        ['person_aaaabbbb', { type: 'person', name: 'Alice' }],
+        ['project_ccccdddd', { type: 'project', name: 'Project B' }]
+      ],
+      relation: ['person:aaaabbbb', 'owns', 'project_ccccdddd'],
+      message: 'Invalid entity id'
     }
   ]
 

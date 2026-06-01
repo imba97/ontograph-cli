@@ -7,9 +7,11 @@ describe('entity add command helper', () => {
   it('should parse preset array field tags by schema', () => {
     const store = createStore()
 
-    entityAdd(store, 'person', 'preset-tags', 'Preset Tags', ['tags=a,b,c'])
+    entityAdd(store, 'person', 'Preset Tags', ['tags=a,b,c'])
 
-    expect(store.getGraph().entities['person:preset-tags']).toMatchObject({
+    const [entityId, entity] = Object.entries(store.getGraph().entities)[0]
+    expect(entityId).toMatch(/^person_[a-f0-9]{12}$/)
+    expect(entity).toMatchObject({
       tags: ['a', 'b', 'c']
     })
   })
@@ -21,9 +23,11 @@ describe('entity add command helper', () => {
       { key: 'authors', type: 'string[]', required: false }
     ])
 
-    entityAdd(store, 'book', 'schema-array', 'Schema Array', ['authors=a,b'])
+    entityAdd(store, 'book', 'Schema Array', ['authors=a,b'])
 
-    expect(store.getGraph().entities['book:schema-array']).toMatchObject({
+    const [entityId, entity] = Object.entries(store.getGraph().entities)[0]
+    expect(entityId).toMatch(/^book_[a-f0-9]{12}$/)
+    expect(entity).toMatchObject({
       authors: ['a', 'b']
     })
   })
@@ -31,9 +35,10 @@ describe('entity add command helper', () => {
   it('should keep non array field as string', () => {
     const store = createStore()
 
-    entityAdd(store, 'person', 'plain-field', 'Plain Field', ['notes=a,b'])
+    entityAdd(store, 'person', 'Plain Field', ['notes=a,b'])
 
-    expect(store.getGraph().entities['person:plain-field']).toMatchObject({
+    const [, entity] = Object.entries(store.getGraph().entities)[0]
+    expect(entity).toMatchObject({
       notes: 'a,b'
     })
   })

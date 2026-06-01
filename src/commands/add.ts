@@ -1,26 +1,28 @@
 import type { OntologyStore } from '../store'
 import type { Entity } from '../types'
 import { consola } from 'consola'
-import { parseKeyValue } from '../utils'
+import { generateEntityId, parseKeyValue } from '../utils'
 
 export function entityAdd(
   store: OntologyStore,
   type: string,
-  id: string,
-  name: string,
+  name: string | undefined,
   props: string[]
 ): void {
+  const entityId = generateEntityId(type)
+  const defaultName = name || entityId
   const arrayFields = store.getArrayFieldsForType(type)
   const extra = parseKeyValue(props, arrayFields)
 
   const entity: Entity = {
     type,
-    name,
+    name: defaultName,
     ...extra
   }
 
-  store.addEntity(`${type}:${id}`, entity)
-  consola.success(`Added ${type} "${id}":`, name)
+  store.addEntity(entityId, entity)
+  consola.success(`Added ${type}: ${entityId}`)
+  consola.info(`Name: ${defaultName}`)
   if (Object.keys(extra).length > 0) {
     consola.info('Properties:', extra)
   }

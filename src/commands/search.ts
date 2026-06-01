@@ -69,6 +69,7 @@ export function entityRelated(
     const fromLabel = r.direction === 'out' ? id : r.id
     const toLabel = r.direction === 'out' ? r.id : id
     consola.log(`  ${fromLabel} ${arrow} [${r.rel}] ${arrow} ${toLabel}`)
-    consola.log(`    ${r.entity.name} (${r.entity.type})`)
+    const entityName = typeof r.entity.name === 'string' && r.entity.name.length > 0 ? r.entity.name : r.id
+    consola.log(`    ${entityName} (${r.entity.type})`)
   }
 }

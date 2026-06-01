@@ -49,14 +49,13 @@ cli.option('--data-dir <dir>', 'Data directory', {
 // ── Entity Commands ─────────────────────────────────────────────────────────
 
 cli
-  .command('add <type> <id>', 'Add a new entity')
+  .command('add <type>', 'Add a new entity')
   .option('-n, --name <name>', 'Entity name')
   .option('-p, --prop <key=value...>', 'Extra properties')
-  .action((type: string, id: string, options) => {
+  .action((type: string, options) => {
     const store = getStore(options)
-    const name = options.name || id
     const props = normalizeOptionList(options.prop)
-    entityAdd(store, type, id, name, props)
+    entityAdd(store, type, options.name, props)
   })
 
 cli

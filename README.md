@@ -14,14 +14,14 @@ pnpx skills add imba97/ontograph-cli -g -a your-agent
 
 ```bash
 # Add entities
-ontograph add person imba97 --name "imba97" --prop timezone=+8
-ontograph add project website --name "Website Redesign" --prop status=active
+ontograph add person --name "imba97" --prop timezone=+8
+ontograph add project --name "Website Redesign" --prop status=active
 
 # Relate them
-ontograph relate person:imba97 owns project:website
+ontograph relate person_62c0841a owns project_8f2b44cd
 
 # Query
-ontograph related person:imba97
+ontograph related person_62c0841a
 ontograph search imba97
 
 # List

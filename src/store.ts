@@ -13,7 +13,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { consola } from 'consola'
 import yaml from 'yaml'
-import { parseEntityId } from './utils'
+import { buildEntityId, parseEntityId } from './utils'
 import { getPresetArrayFields, validateEntity, validateRelation } from './validator'
 
 type EntityIndex = Record<string, string[]>
@@ -158,7 +158,12 @@ export class OntologyStore {
 
         const parsed = this.readYaml<Entity>(filePath)
         if (parsed && typeof parsed === 'object') {
-          entities[`${type}:${id}`] = parsed
+          try {
+            entities[buildEntityId(type, id)] = parsed
+          }
+          catch {
+            this.warnOnce(`bad-entity-id:${type}:${id}`, `Invalid indexed entity id, skipped: ${type}/${id}`)
+          }
         }
         else {
           this.warnOnce(`bad-entity:${filePath}`, `Malformed entity YAML, skipped: ${filePath}`)
@@ -193,11 +198,15 @@ export class OntologyStore {
 
   // ── Entity CRUD ─────────────────────────────────────────────────────────────
 
-  addEntity(fullId: string, entity: Entity): void {
+  addEntity(entityId: string, entity: Entity): void {
     const graph = this.load()
+    const { type, id } = parseEntityId(entityId)
 
-    if (graph.entities[fullId])
-      throw new Error(`Entity "${fullId}" already exists`)
+    if (entity.type !== type)
+      throw new Error(`Entity type mismatch for "${entityId}": payload type is "${entity.type}", id type is "${type}"`)
+
+    if (graph.entities[entityId])
+      throw new Error(`Entity "${entityId}" already exists`)
 
     const errors = validateEntity(entity.type, entity)
     if (errors.length > 0) {
@@ -205,7 +214,6 @@ export class OntologyStore {
       throw new Error(`Validation failed: ${msgs}`)
     }
 
-    const { type, id } = parseEntityId(fullId)
     const filePath = this.entityPath(type, id)
     fs.mkdirSync(path.dirname(filePath), { recursive: true })
     fs.writeFileSync(filePath, yaml.stringify(entity), 'utf8')
@@ -221,15 +229,16 @@ export class OntologyStore {
     this.invalidate()
   }
 
-  updateEntity(fullId: string, patch: Partial<Entity>): void {
+  updateEntity(entityId: string, patch: Partial<Entity>): void {
+    const { type, id } = parseEntityId(entityId)
     const graph = this.load()
-    const existing = graph.entities[fullId]
+    const existing = graph.entities[entityId]
 
     if (!existing)
-      throw new Error(`Entity "${fullId}" not found`)
+      throw new Error(`Entity "${entityId}" not found`)
 
     if (patch.type && patch.type !== existing.type)
-      throw new Error(`Entity "${fullId}" type cannot be changed`)
+      throw new Error(`Entity "${entityId}" type cannot be changed`)
 
     const merged: Entity = {
       ...existing,
@@ -243,20 +252,18 @@ export class OntologyStore {
       throw new Error(`Validation failed: ${msgs}`)
     }
 
-    const { type, id } = parseEntityId(fullId)
     const filePath = this.entityPath(type, id)
     fs.writeFileSync(filePath, yaml.stringify(merged), 'utf8')
 
     this.invalidate()
   }
 
-  removeEntity(fullId: string): void {
+  removeEntity(entityId: string): void {
+    const { type, id } = parseEntityId(entityId)
     const graph = this.load()
 
-    if (!graph.entities[fullId])
-      throw new Error(`Entity "${fullId}" not found`)
-
-    const { type, id } = parseEntityId(fullId)
+    if (!graph.entities[entityId])
+      throw new Error(`Entity "${entityId}" not found`)
     const filePath = this.entityPath(type, id)
     if (fs.existsSync(filePath))
       fs.unlinkSync(filePath)
@@ -271,7 +278,7 @@ export class OntologyStore {
     })
 
     // Remove relations involving this entity
-    this.saveRelations(graph.relations.filter(r => r.from !== fullId && r.to !== fullId))
+    this.saveRelations(graph.relations.filter(r => r.from !== entityId && r.to !== entityId))
 
     this.invalidate()
   }
@@ -279,6 +286,8 @@ export class OntologyStore {
   // ── Relation CRUD ───────────────────────────────────────────────────────────
 
   addRelation(from: string, rel: string, to: string): void {
+    parseEntityId(from)
+    parseEntityId(to)
     const graph = this.load()
 
     const error = validateRelation(from, to, rel, graph)
@@ -293,7 +302,18 @@ export class OntologyStore {
   }
 
   removeRelation(from: string, rel: string, to: string): void {
+    parseEntityId(from)
+    parseEntityId(to)
     const graph = this.load()
+    if (!graph.entities[from])
+      throw new Error(`Source entity "${from}" not found`)
+    if (!graph.entities[to])
+      throw new Error(`Target entity "${to}" not found`)
+
+    const exists = graph.relations.some(r => r.from === from && r.rel === rel && r.to === to)
+    if (!exists)
+      throw new Error(`Relation not found: ${from} --${rel}--> ${to}`)
+
     this.saveRelations(graph.relations.filter(r => !(r.from === from && r.rel === rel && r.to === to)))
     this.invalidate()
   }
@@ -316,20 +336,35 @@ export class OntologyStore {
   }
 
   related(id: string, rel?: string): RelatedResult[] {
+    parseEntityId(id)
     const adj = this.getAdj()
     const graph = this.load()
+    if (!graph.entities[id])
+      throw new Error(`Entity "${id}" not found`)
     const results: RelatedResult[] = []
 
     // Outgoing
     for (const { rel: r, neighbor } of adj.out[id] ?? []) {
-      if (!rel || rel === r)
-        results.push({ id: neighbor, entity: graph.entities[neighbor]!, rel: r, direction: 'out' })
+      if (!rel || rel === r) {
+        const entity = graph.entities[neighbor]
+        if (!entity) {
+          this.warnOnce(`missing-related:${id}:${r}:${neighbor}`, `Skipping relation with missing entity: ${id} --${r}--> ${neighbor}`)
+          continue
+        }
+        results.push({ id: neighbor, entity, rel: r, direction: 'out' })
+      }
     }
 
     // Incoming
     for (const { rel: r, neighbor } of adj.in[id] ?? []) {
-      if (!rel || rel === r)
-        results.push({ id: neighbor, entity: graph.entities[neighbor]!, rel: r, direction: 'in' })
+      if (!rel || rel === r) {
+        const entity = graph.entities[neighbor]
+        if (!entity) {
+          this.warnOnce(`missing-related:${neighbor}:${r}:${id}`, `Skipping relation with missing entity: ${neighbor} --${r}--> ${id}`)
+          continue
+        }
+        results.push({ id: neighbor, entity, rel: r, direction: 'in' })
+      }
     }
 
     return results
@@ -367,6 +402,8 @@ export class OntologyStore {
   }
 
   findPath(from: string, to: string, maxDepth: number = 5): PathResult | null {
+    parseEntityId(from)
+    parseEntityId(to)
     const graph = this.load()
 
     if (!graph.entities[from] || !graph.entities[to])
