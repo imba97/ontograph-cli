@@ -10,6 +10,7 @@ import type {
   UserEntitySchema,
   UserRelationSchema
 } from './types'
+import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { consola } from 'consola'
@@ -38,6 +39,8 @@ const STORE_PATHS = {
 
 export class OntologyStore {
   private dataDir: string
+  private readOnly: boolean
+  private strict: boolean
 
   // Cached views
   private graph: Graph | null = null
@@ -46,7 +49,12 @@ export class OntologyStore {
 
   constructor(options: StoreOptions) {
     this.dataDir = options.dataDir
-    this.ensureDataDir()
+    this.readOnly = options.readOnly ?? false
+    this.strict = options.strict ?? false
+    if (fs.existsSync(`${this.dataDir}.transaction.json`))
+      throw new Error(`Unfinished graph transaction: ${this.dataDir}.transaction.json`)
+    if (!this.readOnly)
+      this.ensureDataDir()
   }
 
   // ── Path helpers ─────────────────────────────────────────────────────────────
@@ -75,15 +83,24 @@ export class OntologyStore {
       const raw = fs.readFileSync(filePath, 'utf8')
       return yaml.parse(raw) as T
     }
-    catch {
+    catch (error) {
+      if (this.strict)
+        throw new Error(`Cannot read graph YAML: ${filePath}`, { cause: error })
       return null
     }
   }
 
   private writeYamlAtomic(filePath: string, data: unknown): void {
-    const tmp = `${filePath}.tmp`
-    fs.writeFileSync(tmp, yaml.stringify(data), 'utf8')
-    fs.renameSync(tmp, filePath)
+    this.assertWritable()
+    const tmp = `${filePath}.${randomUUID()}.tmp`
+    try {
+      fs.writeFileSync(tmp, yaml.stringify(data), { flag: 'wx' })
+      fs.renameSync(tmp, filePath)
+    }
+    finally {
+      if (fs.existsSync(tmp))
+        fs.unlinkSync(tmp)
+    }
   }
 
   // ── Index I/O ────────────────────────────────────────────────────────────────
@@ -95,12 +112,17 @@ export class OntologyStore {
 
     const parsed = this.readYaml<{ entities?: EntityIndex }>(filePath)
     if (!parsed || typeof parsed !== 'object') {
+      if (this.strict)
+        throw new Error(`Malformed graph index: ${filePath}`)
       this.warnOnce(`bad-index:${filePath}`, `Malformed index YAML, fallback to empty index: ${filePath}`)
       return {}
     }
 
-    if (!parsed.entities || typeof parsed.entities !== 'object')
+    if (!parsed.entities || typeof parsed.entities !== 'object') {
+      if (this.strict)
+        throw new Error(`Malformed graph index: ${filePath}`)
       return {}
+    }
 
     return parsed.entities
   }
@@ -158,6 +180,8 @@ export class OntologyStore {
       for (const id of ids) {
         const filePath = this.entityPath(type, id)
         if (!fs.existsSync(filePath)) {
+          if (this.strict)
+            throw new Error(`Indexed entity file is missing: ${filePath}`)
           this.warnOnce(`missing-entity:${filePath}`, `Indexed entity file is missing, skipped: ${filePath}`)
           continue
         }
@@ -172,12 +196,22 @@ export class OntologyStore {
           }
         }
         else {
+          if (this.strict)
+            throw new Error(`Malformed entity YAML: ${filePath}`)
           this.warnOnce(`bad-entity:${filePath}`, `Malformed entity YAML, skipped: ${filePath}`)
         }
       }
     }
 
     this.graph = { entities, relations }
+    if (this.strict) {
+      for (const relation of relations) {
+        if (!relation || typeof relation.from !== 'string' || typeof relation.to !== 'string' || typeof relation.rel !== 'string'
+          || !entities[relation.from] || !entities[relation.to]) {
+          throw new Error('Graph relation has a missing or invalid endpoint')
+        }
+      }
+    }
     return this.graph
   }
 
@@ -188,6 +222,8 @@ export class OntologyStore {
 
     const parsed = this.readYaml<Relation[]>(relPath)
     if (!parsed || !Array.isArray(parsed)) {
+      if (this.strict)
+        throw new Error(`Malformed graph relations: ${relPath}`)
       this.warnOnce(`bad-relations:${relPath}`, `Malformed relations YAML, fallback to empty relations: ${relPath}`)
       return []
     }
@@ -205,6 +241,7 @@ export class OntologyStore {
   // ── Entity CRUD ─────────────────────────────────────────────────────────────
 
   addEntity(entityId: string, entity: Entity): void {
+    this.assertWritable()
     const graph = this.load()
     const { type, id } = parseEntityId(entityId)
 
@@ -227,7 +264,7 @@ export class OntologyStore {
 
     const filePath = this.entityPath(type, id)
     fs.mkdirSync(path.dirname(filePath), { recursive: true })
-    fs.writeFileSync(filePath, yaml.stringify(entity), 'utf8')
+    fs.writeFileSync(filePath, yaml.stringify(entity), { flag: 'wx' })
 
     // Incrementally update index
     this.updateIndex((index) => {
@@ -241,6 +278,7 @@ export class OntologyStore {
   }
 
   updateEntity(entityId: string, patch: Partial<Entity>): void {
+    this.assertWritable()
     const { type, id } = parseEntityId(entityId)
     const graph = this.load()
     const existing = graph.entities[entityId]
@@ -269,12 +307,13 @@ export class OntologyStore {
     }
 
     const filePath = this.entityPath(type, id)
-    fs.writeFileSync(filePath, yaml.stringify(merged), 'utf8')
+    this.writeYamlAtomic(filePath, merged)
 
     this.invalidate()
   }
 
   removeEntity(entityId: string): void {
+    this.assertWritable()
     const { type, id } = parseEntityId(entityId)
     const graph = this.load()
 
@@ -302,6 +341,7 @@ export class OntologyStore {
   // ── Relation CRUD ───────────────────────────────────────────────────────────
 
   addRelation(from: string, rel: string, to: string): void {
+    this.assertWritable()
     parseEntityId(from)
     parseEntityId(to)
     const graph = this.load()
@@ -319,6 +359,7 @@ export class OntologyStore {
   }
 
   removeRelation(from: string, rel: string, to: string): void {
+    this.assertWritable()
     parseEntityId(from)
     parseEntityId(to)
     const graph = this.load()
@@ -475,6 +516,68 @@ export class OntologyStore {
 
   getDataDir(): string {
     return this.dataDir
+  }
+
+  defineRelationType(key: string, schema: UserRelationSchema, replace = false): void {
+    this.assertWritable()
+    if (!/^[a-z][\w-]*$/i.test(key) || !schema.name.trim() || !schema.fromTypes.length || !schema.toTypes.length)
+      throw new Error('Invalid relation type definition')
+    const directory = path.join(this.dataDir, 'user-relations')
+    const file = path.join(directory, `${key}.yaml`)
+    fs.mkdirSync(directory, { recursive: true })
+    if (replace) {
+      if (!fs.existsSync(file))
+        throw new Error(`Relation type not found: ${key}`)
+      this.writeYamlAtomic(file, schema)
+    }
+    else {
+      fs.writeFileSync(file, yaml.stringify(schema), { flag: 'wx' })
+    }
+  }
+
+  /** The caller serializes writers. All mutations are staged before replacing the graph directory. */
+  transaction<T>(action: (store: OntologyStore) => T): T {
+    this.assertWritable()
+    const target = path.resolve(this.dataDir)
+    const stage = `${target}.${randomUUID()}.tmp`
+    const backup = `${target}.${randomUUID()}.tmp`
+    const journal = `${target}.transaction.json`
+    let moved = false
+    let installed = false
+    try {
+      fs.cpSync(target, stage, { recursive: true, errorOnExist: true, force: false })
+      const transaction = new OntologyStore({ dataDir: stage, strict: this.strict })
+      const result = action(transaction)
+      if (result && typeof (result as { then?: unknown }).then === 'function')
+        throw new Error('Graph transaction callback must be synchronous')
+      transaction.getGraph()
+      fs.writeFileSync(journal, JSON.stringify({ target, stage, backup }), { flag: 'wx' })
+      fs.renameSync(target, backup)
+      moved = true
+      fs.renameSync(stage, target)
+      installed = true
+      this.invalidate()
+      fs.unlinkSync(journal)
+      return result
+    }
+    catch (error) {
+      if (moved && !installed)
+        fs.renameSync(backup, target)
+      if (fs.existsSync(journal) && (!moved || !installed))
+        fs.unlinkSync(journal)
+      throw error
+    }
+    finally {
+      if (fs.existsSync(stage))
+        fs.rmSync(stage, { recursive: true })
+      if (installed && fs.existsSync(backup))
+        fs.rmSync(backup, { recursive: true })
+    }
+  }
+
+  private assertWritable(): void {
+    if (this.readOnly)
+      throw new Error('Graph is read only')
   }
 
   getArrayFieldsForType(type: string): Set<string> {

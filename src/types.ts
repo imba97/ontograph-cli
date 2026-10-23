@@ -52,6 +52,8 @@ export interface RelatedResult {
 
 export interface StoreOptions {
   dataDir: string
+  readOnly?: boolean
+  strict?: boolean
 }
 
 // ── Aggregate Result ─────────────────────────────────────────────────────────

@@ -17,6 +17,16 @@
     "relationship",
     "cli"
   ],
+  "exports": {
+    ".": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.mjs"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.mjs"
+    }
+  },
   "main": "dist/index.mjs",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
