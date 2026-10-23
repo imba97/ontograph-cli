@@ -178,7 +178,7 @@ ontograph relation-type update <name> [--name <显示名>] [--desc <描述>] [--
 
 ## Hermes Agent 集成
 
-本工具附带 `SKILL.md`，Hermes Agent 可直接识别并通过 `terminal` 调用：
+本工具附带 [`skills/ontograph/SKILL.md`](./skills/ontograph/SKILL.md)，Agent 可直接识别并通过 `terminal` 调用：
 
 ```bash
 ontograph search <关键词>

@@ -1,10 +1,9 @@
 ---
-name: ontograph-cli
-description: Entity-relationship knowledge graph CLI — add entities, relate them, and query the graph. Useful for tracking people, projects, tasks and their relationships.
-platforms: [linux, macos]
+name: ontograph
+description: Manages an entity-relationship knowledge graph — add typed entities, relate them, and query the graph. Useful for tracking people, projects, tasks and their relationships.
+license: MIT
 metadata:
-  hermes:
-    tags: [ontograph-cli, knowledge-graph, entity, relationship, cli]
+  tags: [knowledge-graph, entity, relationship, cli]
 ---
 
 # Ontograph CLI — Entity-Relationship Graph

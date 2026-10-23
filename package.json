@@ -24,9 +24,9 @@
     "ontograph": "./bin/ontograph.mjs"
   },
   "files": [
-    "SKILL.md",
     "bin",
-    "dist"
+    "dist",
+    "skills"
   ],
   "scripts": {
     "stub": "unbuild --stub",

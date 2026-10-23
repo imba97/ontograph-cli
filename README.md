@@ -10,6 +10,8 @@ Add entities, relate them, and query the graph — all from the terminal.
 pnpx skills add imba97/ontograph-cli -g -a your-agent
 ```
 
+The skill lives at [`skills/ontograph/SKILL.md`](./skills/ontograph/SKILL.md).
+
 ## Quick Start
 
 ```bash
