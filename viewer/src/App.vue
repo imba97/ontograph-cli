@@ -19,6 +19,7 @@ import {
 } from '@lucide/vue'
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY } from 'd3-force'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { wheelZoomFactor } from './zoom'
 
 interface Point { x: number, y: number }
 interface Transform { x: number, y: number, scale: number }
@@ -304,8 +305,7 @@ function zoomAt(delta: number, clientX?: number, clientY?: number): void {
 
 function onWheel(event: WheelEvent): void {
   event.preventDefault()
-  const delta = Math.max(-100, Math.min(100, event.deltaY))
-  zoomAt(Math.exp(-delta * 0.00055), event.clientX, event.clientY)
+  zoomAt(wheelZoomFactor(event), event.clientX, event.clientY)
 }
 
 function toggleSet(set: Set<string>, value: string): void {
