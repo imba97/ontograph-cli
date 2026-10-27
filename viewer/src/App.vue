@@ -1,6 +1,22 @@
 <script setup lang="ts">
 import type { Simulation, SimulationLinkDatum } from 'd3-force'
 import type { LayoutNode, ViewerEdge, ViewerGraph, ViewerNode } from './types'
+import {
+  ArrowLeft,
+  ArrowRight,
+  CircleDot,
+  Focus,
+  Moon,
+  Network,
+  RefreshCcw,
+  RefreshCw,
+  Search,
+  Square,
+  Sun,
+  X,
+  ZoomIn,
+  ZoomOut
+} from '@lucide/vue'
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY } from 'd3-force'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 
@@ -204,6 +220,11 @@ function edgePath(edge: ViewerEdge): string {
   return `M ${source.x} ${source.y} Q ${mx} ${my} ${target.x} ${target.y}`
 }
 
+function nodeTransform(node: LayoutNode): string {
+  void positionsVersion.value
+  return `translate(${node.x * transform.scale}px, ${node.y * transform.scale}px) scale(${Math.min(1, transform.scale)})`
+}
+
 function nodeClass(node: LayoutNode): Record<string, boolean> {
   return {
     selected: node.id === selectedId.value,
@@ -283,7 +304,8 @@ function zoomAt(delta: number, clientX?: number, clientY?: number): void {
 
 function onWheel(event: WheelEvent): void {
   event.preventDefault()
-  zoomAt(event.deltaY < 0 ? 1.12 : 0.89, event.clientX, event.clientY)
+  const delta = Math.max(-100, Math.min(100, event.deltaY))
+  zoomAt(Math.exp(-delta * 0.00055), event.clientX, event.clientY)
 }
 
 function toggleSet(set: Set<string>, value: string): void {
@@ -302,21 +324,22 @@ onBeforeUnmount(() => simulation?.stop())
   <main class="app-shell">
     <header class="topbar glass">
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true">◎</span>
+        <span class="brand-mark" aria-hidden="true"><Network :size="19" :stroke-width="2.2" /></span>
         <div>
           <strong>Ontograph</strong>
           <span>Inspector</span>
         </div>
       </div>
       <label class="search">
-        <span aria-hidden="true">⌕</span>
+        <Search :size="15" aria-hidden="true" />
         <input v-model="query" type="search" placeholder="Search entities by name or ID" aria-label="Search entities">
         <kbd v-if="query">{{ visibleNodes.length }}</kbd>
       </label>
       <div class="header-actions">
         <span class="stats">{{ visibleNodes.length }} nodes · {{ visibleEdges.length }} relations</span>
         <button class="icon-button" type="button" :aria-label="dark ? 'Use light theme' : 'Use dark theme'" @click="toggleTheme">
-          {{ dark ? '☼' : '◐' }}
+          <Sun v-if="dark" :size="17" />
+          <Moon v-else :size="17" />
         </button>
       </div>
     </header>
@@ -372,7 +395,7 @@ onBeforeUnmount(() => simulation?.stop())
           </button>
         </div>
 
-        <div class="world" :style="{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }">
+        <div class="world" :style="{ transform: `translate(${transform.x}px, ${transform.y}px)` }">
           <svg class="edges" aria-hidden="true">
             <defs>
               <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -382,7 +405,7 @@ onBeforeUnmount(() => simulation?.stop())
                 <path d="M 0 0 L 10 5 L 0 10 z" />
               </marker>
             </defs>
-            <g class="edge-layer">
+            <g class="edge-layer" :transform="`translate(5000 5000) scale(${transform.scale})`">
               <g v-for="edge in visibleEdges" :key="edge.id" class="edge" :class="{ active: selectedEdgeIds.has(edge.id), faded: selectedId && !selectedEdgeIds.has(edge.id) }">
                 <path :d="edgePath(edge)" :marker-end="selectedEdgeIds.has(edge.id) ? 'url(#arrow-active)' : 'url(#arrow)'" />
                 <text v-if="selectedEdgeIds.has(edge.id)">
@@ -399,7 +422,7 @@ onBeforeUnmount(() => simulation?.stop())
             type="button"
             class="graph-node"
             :class="nodeClass(node)"
-            :style="{ 'transform': `translate(${node.x}px, ${node.y}px)`, '--node-color': colorFor(node.type) }"
+            :style="{ 'transform': nodeTransform(node), '--node-color': colorFor(node.type) }"
             :aria-label="`${node.name}, ${node.type}`"
             @click.stop="selectNode(node.id)"
             @pointerdown="startNodeDrag($event, node)"
@@ -417,24 +440,25 @@ onBeforeUnmount(() => simulation?.stop())
         </div>
 
         <div class="toolbar glass" aria-label="Graph controls">
-          <button type="button" title="Zoom out" aria-label="Zoom out" @click="zoomAt(0.82)">
-            −
+          <button type="button" title="Zoom out" aria-label="Zoom out" @click="zoomAt(0.89)">
+            <ZoomOut :size="17" />
           </button>
           <button type="button" title="Fit graph" aria-label="Fit graph" @click="fitGraph">
-            ⌗
+            <Focus :size="17" />
           </button>
-          <button type="button" title="Zoom in" aria-label="Zoom in" @click="zoomAt(1.22)">
-            ＋
+          <button type="button" title="Zoom in" aria-label="Zoom in" @click="zoomAt(1.12)">
+            <ZoomIn :size="17" />
           </button>
           <span class="toolbar-divider" />
-          <button type="button" :class="{ active: !cardMode }" :title="cardMode ? 'Use dot nodes' : 'Use card nodes'" @click="toggleMode">
-            {{ cardMode ? '●' : '▣' }}
+          <button type="button" :class="{ active: !cardMode }" :title="cardMode ? 'Use dot nodes' : 'Use card nodes'" :aria-label="cardMode ? 'Use dot nodes' : 'Use card nodes'" @click="toggleMode">
+            <CircleDot v-if="cardMode" :size="17" />
+            <Square v-else :size="17" />
           </button>
           <button type="button" title="Reorganize graph" aria-label="Reorganize graph" @click="resetLayout">
-            ↻
+            <RefreshCcw :size="17" />
           </button>
           <button type="button" title="Reload data" aria-label="Reload data" @click="loadGraph">
-            ⟳
+            <RefreshCw :size="17" />
           </button>
         </div>
       </div>
@@ -447,7 +471,7 @@ onBeforeUnmount(() => simulation?.stop())
               <div><strong>{{ selected.name }}</strong><span>{{ selected.type }}</span></div>
             </div>
             <button class="icon-button" type="button" aria-label="Close details" @click="clearSelection">
-              ×
+              <X :size="18" />
             </button>
           </header>
           <code class="entity-id">{{ selected.id }}</code>
@@ -467,7 +491,7 @@ onBeforeUnmount(() => simulation?.stop())
               No incoming relationships
             </div>
             <button v-for="edge in incoming" :key="edge.id" type="button" class="relation-row" @click="selectNode(edge.source, true)">
-              <span class="relation-direction">←</span>
+              <span class="relation-direction"><ArrowLeft :size="15" /></span>
               <span><strong>{{ relatedNode(edge, 'in')?.name ?? edge.source }}</strong><small>{{ edge.relation }}</small></span>
             </button>
           </section>
@@ -478,7 +502,7 @@ onBeforeUnmount(() => simulation?.stop())
               No outgoing relationships
             </div>
             <button v-for="edge in outgoing" :key="edge.id" type="button" class="relation-row" @click="selectNode(edge.target, true)">
-              <span class="relation-direction">→</span>
+              <span class="relation-direction"><ArrowRight :size="15" /></span>
               <span><strong>{{ relatedNode(edge, 'out')?.name ?? edge.target }}</strong><small>{{ edge.relation }}</small></span>
             </button>
           </section>

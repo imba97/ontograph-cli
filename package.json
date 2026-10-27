@@ -58,6 +58,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^9.5.1",
+    "@lucide/vue": "^1.61.0",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^26.6.5",
     "@vitejs/plugin-vue": "^6.0.10",
