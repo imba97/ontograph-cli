@@ -29,7 +29,20 @@ ontograph search imba97
 # List
 ontograph list
 ontograph types
+
+# Explore the relationship graph in a browser
+ontograph inspect
 ```
+
+## Inspector
+
+`ontograph inspect` starts a local read-only relationship viewer and opens it in your browser. It uses a force-directed graph rather than a hierarchy, so connected entities form natural clusters without requiring a root node.
+
+```bash
+ontograph inspect [--data-dir <dir>] [--port <port>] [--host <address>] [--no-open] [--focus <entity-id>]
+```
+
+The viewer supports search and type filters, card/dot node modes, pan and zoom, manual data reload, and a relationship drawer for the selected entity. It does not watch files, edit graph data, or generate an HTML artifact.
 
 ## Data
 

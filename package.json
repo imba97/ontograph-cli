@@ -40,11 +40,13 @@
   ],
   "scripts": {
     "stub": "unbuild --stub",
-    "build": "unbuild",
+    "build": "unbuild && vite build --config viewer/vite.config.ts",
     "release": "bumpp",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint --cache",
+    "typecheck": "tsc --noEmit && vue-tsc --noEmit -p viewer/tsconfig.json",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "prepare": "simple-git-hooks",
     "ontograph": "node bin/ontograph.mjs"
   },
@@ -56,14 +58,20 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^9.5.1",
+    "@types/d3-force": "^3.0.10",
     "@types/node": "^26.6.5",
+    "@vitejs/plugin-vue": "^6.0.10",
     "bumpp": "^12.3.0",
+    "d3-force": "^3.0.0",
     "eslint": "^10.13.0",
     "nano-staged": "^1.0.2",
     "simple-git-hooks": "^2.14.0",
     "typescript": "6.0.3",
     "unbuild": "^3.6.1",
-    "vitest": "^5.0.5"
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5",
+    "vue": "^3.5.44",
+    "vue-tsc": "^3.3.13"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm nano-staged"

@@ -30,9 +30,22 @@ ontograph search 久期
 # 列表
 ontograph list
 ontograph types
+
+# 在浏览器中查看关系图谱
+ontograph inspect
 ```
 
 ## 命令参考
+
+### `inspect`
+
+启动本地只读关系图谱 Viewer，并自动在浏览器中打开。画布使用力导向布局，不要求根节点，关联实体会自然形成多个关系簇。
+
+```bash
+ontograph inspect [--data-dir <目录>] [--port <端口>] [--host <地址>] [--no-open] [--focus <实体ID>]
+```
+
+支持搜索和类型筛选、卡片/圆点模式、平移缩放、手动重新加载，以及选中实体的关系抽屉。第一版不监听文件变化、不编辑图数据，也不生成 HTML 文件。
 
 ### `add <type>`
 

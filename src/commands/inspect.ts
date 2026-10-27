@@ -11,6 +11,9 @@ export interface InspectOptions {
 }
 
 export async function inspectGraph(options: InspectOptions): Promise<void> {
+  if (options.host && !['127.0.0.1', 'localhost', '::1'].includes(options.host))
+    consola.warn(`Inspector is exposed on ${options.host}. The viewer has no authentication.`)
+
   const viewer = await startViewerServer(options)
   const url = options.focus
     ? `${viewer.url}/#node=${encodeURIComponent(options.focus)}`
