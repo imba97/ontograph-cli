@@ -10,6 +10,7 @@ import {
   entityTypeUpdate,
   entityTypeView
 } from './commands/entity-type'
+import { inspectGraph } from './commands/inspect'
 import {
   entityAggregate,
   entityList,
@@ -174,6 +175,22 @@ cli
     const relationCount = graph.relations.length
     consola.info(`Data: ${store.getDataDir()}`)
     consola.info(`Entities: ${entityCount}  |  Relations: ${relationCount}`)
+  })
+
+cli
+  .command('inspect', 'Explore the ontology as an interactive graph')
+  .option('--host <address>', 'Viewer host', { default: '127.0.0.1' })
+  .option('--port <port>', 'Viewer port', { default: 0 })
+  .option('--no-open', 'Do not open a browser')
+  .option('--focus <entity-id>', 'Select an entity when the viewer opens')
+  .action(async (options) => {
+    await inspectGraph({
+      dataDir: options.dataDir,
+      host: options.host,
+      port: Number(options.port),
+      open: options.open,
+      focus: options.focus
+    })
   })
 
 // ── Type Management ───────────────────────────────────────────────────────────
