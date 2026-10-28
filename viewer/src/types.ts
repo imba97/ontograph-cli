@@ -24,6 +24,17 @@ export interface ViewerWorkflow {
   completedAt?: string | null
   milestone?: boolean
   goals: ViewerGoal[]
+  history: ViewerHistory[]
+}
+
+export interface ViewerHistory {
+  id: string
+  at: string
+  kind: string
+  text: string
+  from?: string | null
+  to?: string
+  stage?: string | null
 }
 
 export interface LayoutNode extends ViewerNode, SimulationNodeDatum {

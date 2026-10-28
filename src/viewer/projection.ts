@@ -24,6 +24,17 @@ export interface ViewerWorkflow {
   completedAt?: string | null
   milestone?: boolean
   goals: ViewerGoal[]
+  history: ViewerHistory[]
+}
+
+export interface ViewerHistory {
+  id: string
+  at: string
+  kind: string
+  text: string
+  from?: string | null
+  to?: string
+  stage?: string | null
 }
 
 export interface ViewerEdge {
@@ -78,12 +89,32 @@ function projectWorkflow(entity: Entity): ViewerWorkflow | undefined {
       })
     : []
 
+  const history = Array.isArray(entity.history)
+    ? entity.history.flatMap((entry, index) => {
+        if (!entry || typeof entry !== 'object')
+          return []
+        const value = entry as Record<string, unknown>
+        if (typeof value.at !== 'string' || typeof value.kind !== 'string' || typeof value.text !== 'string')
+          return []
+        return [{
+          id: typeof value.id === 'string' ? value.id : `history-${index}`,
+          at: value.at,
+          kind: value.kind,
+          text: value.text,
+          from: typeof value.from === 'string' || value.from === null ? value.from : undefined,
+          to: typeof value.to === 'string' ? value.to : undefined,
+          stage: typeof value.stage === 'string' || value.stage === null ? value.stage : undefined
+        }]
+      })
+    : []
+
   return {
     status: typeof entity.status === 'string' ? entity.status : undefined,
     stage: typeof entity.stage === 'string' || entity.stage === null ? entity.stage : undefined,
     completedAt: typeof entity.completedAt === 'string' || entity.completedAt === null ? entity.completedAt : undefined,
     milestone: typeof entity.milestone === 'boolean' ? entity.milestone : undefined,
-    goals
+    goals,
+    history
   }
 }
 

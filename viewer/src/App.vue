@@ -4,10 +4,13 @@ import type { LayoutNode, ViewerEdge, ViewerGraph, ViewerNode } from './types'
 import {
   ArrowLeft,
   ArrowRight,
+  BarChart3,
   Check,
   CircleDot,
+  Clock3,
   Flag,
   Focus,
+  GitBranch,
   Moon,
   Network,
   RefreshCcw,
@@ -26,6 +29,7 @@ import { wheelZoomFactor } from './zoom'
 interface Point { x: number, y: number }
 interface Transform { x: number, y: number, scale: number }
 interface LayoutLink extends SimulationLinkDatum<LayoutNode> { id: string }
+interface StageSummary { name: string, at?: string, current: boolean, achieved: number, total: number }
 
 const TYPE_COLORS = ['#7c6cf2', '#0ea5a4', '#e07a45', '#db5c95', '#3f83d1', '#8a9a44', '#b668db', '#60798c']
 const graph = ref<ViewerGraph | null>(null)
@@ -34,6 +38,9 @@ const loading = ref(true)
 const reloadError = ref('')
 const query = ref('')
 const selectedId = ref('')
+const drawerTab = ref<'overview' | 'journey' | 'relations'>('overview')
+const overviewOpen = ref(false)
+const onlyMilestones = ref(false)
 const cardMode = ref(localStorage.getItem('ontograph-node-mode') !== 'dot')
 const dark = ref(localStorage.getItem('ontograph-theme') === 'dark' || (!localStorage.getItem('ontograph-theme') && matchMedia('(prefers-color-scheme: dark)').matches))
 const hiddenTypes = reactive(new Set<string>())
@@ -54,6 +61,30 @@ const taskNodes = computed(() => workflowNodes.value.filter(isTaskNode))
 const workflowStatuses = computed(() => [...new Set(taskNodes.value.flatMap(node => node.workflow?.status ? [node.workflow.status] : []))].sort())
 const workflowStages = computed(() => [...new Set(taskNodes.value.map(node => node.workflow?.stage || 'Unstaged'))].sort())
 const completedTaskCount = computed(() => taskNodes.value.filter(node => isCompleted(node)).length)
+const milestoneCount = computed(() => taskNodes.value.filter(node => node.workflow?.milestone).length)
+const taskGoalProgress = computed(() => {
+  const goals = taskNodes.value.flatMap(node => node.workflow?.goals ?? [])
+  const achieved = goals.filter(goal => goal.status === 'achieved').length
+  const total = goals.filter(goal => goal.status !== 'cancelled').length
+  return { achieved, total }
+})
+const milestoneContextIds = computed(() => {
+  if (!onlyMilestones.value)
+    return null
+  const milestoneIds = new Set(taskNodes.value.filter(node => node.workflow?.milestone).map(node => node.id))
+  const ids = new Set(milestoneIds)
+  for (const edge of graph.value?.edges ?? []) {
+    if (edge.relation !== 'child_of')
+      continue
+    const source = nodeById.value.get(edge.source)
+    const target = nodeById.value.get(edge.target)
+    if (milestoneIds.has(edge.source) && target && isTaskNode(target))
+      ids.add(edge.target)
+    if (milestoneIds.has(edge.target) && source && isTaskNode(source))
+      ids.add(edge.source)
+  }
+  return ids
+})
 const visibleNodes = computed(() => {
   const needle = query.value.trim().toLocaleLowerCase()
   return nodes.value.filter((node) => {
@@ -62,6 +93,7 @@ const visibleNodes = computed(() => {
       || ((!node.workflow?.status || !hiddenStatuses.has(node.workflow.status)) && !hiddenStages.has(stage))
     return !hiddenTypes.has(node.type)
       && workflowVisible
+      && (!milestoneContextIds.value || milestoneContextIds.value.has(node.id))
       && (!needle || node.name.toLocaleLowerCase().includes(needle) || node.id.toLocaleLowerCase().includes(needle))
   })
 })
@@ -80,7 +112,7 @@ const outgoing = computed(() => graph.value?.edges.filter(edge => edge.source ==
 const selectedProperties = computed(() => {
   if (!selected.value?.workflow)
     return selected.value?.properties ?? {}
-  const workflowKeys = new Set(['status', 'stage', 'goals', 'completedAt', 'milestone'])
+  const workflowKeys = new Set(['status', 'stage', 'goals', 'history', 'completedAt', 'milestone'])
   return Object.fromEntries(Object.entries(selected.value.properties).filter(([key]) => !workflowKeys.has(key)))
 })
 const selectedGoals = computed(() => {
@@ -92,6 +124,47 @@ const selectedGoals = computed(() => {
     const rightCurrent = right.stage === workflow.stage ? 0 : right.stage == null ? 1 : 2
     return leftCurrent - rightCurrent
   })
+})
+const selectedChildren = computed(() => {
+  if (!selectedId.value)
+    return []
+  const childIds = new Set((graph.value?.edges ?? [])
+    .filter(edge => edge.relation === 'child_of' && edge.target === selectedId.value)
+    .map(edge => edge.source))
+  return nodes.value.filter(node => childIds.has(node.id))
+})
+const selectedChildProgress = computed(() => {
+  const completed = selectedChildren.value.filter(node => isCompleted(node)).length
+  return { completed, total: selectedChildren.value.length }
+})
+const selectedHistory = computed(() => [...(selected.value?.workflow?.history ?? [])].sort((left, right) => right.at.localeCompare(left.at)))
+const selectedStages = computed<StageSummary[]>(() => {
+  const workflow = selected.value?.workflow
+  if (!workflow)
+    return []
+  const enteredAt = new Map<string, string>()
+  for (const entry of [...workflow.history].sort((left, right) => left.at.localeCompare(right.at))) {
+    if (entry.kind !== 'stage')
+      continue
+    const stage = entry.to || entry.stage
+    if (stage && !enteredAt.has(stage))
+      enteredAt.set(stage, entry.at)
+  }
+  const names = new Set<string>([
+    ...enteredAt.keys(),
+    ...workflow.goals.flatMap(goal => goal.stage ? [goal.stage] : []),
+    ...(workflow.stage ? [workflow.stage] : [])
+  ])
+  return [...names].map((name) => {
+    const goals = workflow.goals.filter(goal => goal.stage === name && goal.status !== 'cancelled')
+    return {
+      name,
+      at: enteredAt.get(name),
+      current: name === workflow.stage,
+      achieved: goals.filter(goal => goal.status === 'achieved').length,
+      total: goals.length
+    }
+  }).sort((left, right) => (left.at ?? '9999').localeCompare(right.at ?? '9999'))
 })
 
 const STATUS_LABELS: Record<string, string> = {
@@ -145,6 +218,49 @@ function resetFilters(): void {
   hiddenRelations.clear()
   hiddenStatuses.clear()
   hiddenStages.clear()
+  onlyMilestones.value = false
+}
+
+function isolateStatus(status: string): void {
+  hiddenStatuses.clear()
+  for (const value of workflowStatuses.value) {
+    if (value !== status)
+      hiddenStatuses.add(value)
+  }
+  overviewOpen.value = false
+}
+
+function isolateStage(stage: string): void {
+  hiddenStages.clear()
+  for (const value of workflowStages.value) {
+    if (value !== stage)
+      hiddenStages.add(value)
+  }
+  overviewOpen.value = false
+}
+
+function toggleOverview(): void {
+  overviewOpen.value = !overviewOpen.value
+  if (overviewOpen.value)
+    clearSelection()
+}
+
+function childProgress(node: ViewerNode): { completed: number, total: number, percent: number } {
+  const childIds = (graph.value?.edges ?? [])
+    .filter(edge => edge.relation === 'child_of' && edge.target === node.id)
+    .map(edge => edge.source)
+  const children = childIds.flatMap(id => nodeById.value.get(id) ?? [])
+  const completed = children.filter(child => isCompleted(child)).length
+  return { completed, total: children.length, percent: children.length ? completed / children.length * 100 : 0 }
+}
+
+function formatDateTime(value?: string): string {
+  if (!value)
+    return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime()))
+    return value
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
 
 function colorFor(type: string): string {
@@ -255,7 +371,9 @@ function toggleTheme(): void {
 }
 
 function selectNode(id: string, center = false): void {
+  overviewOpen.value = false
   selectedId.value = id
+  drawerTab.value = 'overview'
   history.replaceState(null, '', `#node=${encodeURIComponent(id)}`)
   if (center) {
     const node = nodeById.value.get(id)
@@ -318,7 +436,8 @@ function nodeClass(node: LayoutNode): Record<string, boolean> {
     'faded': Boolean(selectedId.value && node.id !== selectedId.value && !neighborIds.value.has(node.id)),
     'dot': !cardMode.value,
     'has-workflow': Boolean(node.workflow),
-    'completed': isCompleted(node)
+    'completed': isCompleted(node),
+    'milestone': Boolean(node.workflow?.milestone)
   }
 }
 
@@ -423,10 +542,12 @@ onBeforeUnmount(() => simulation?.stop())
         <kbd v-if="query">{{ visibleNodes.length }}</kbd>
       </label>
       <div class="header-actions">
-        <span class="stats">
+        <button v-if="taskNodes.length" type="button" class="stats stats-button" :class="{ active: overviewOpen }" @click="toggleOverview">
+          <BarChart3 :size="14" />
           {{ visibleNodes.length }} nodes · {{ visibleEdges.length }} relations
-          <template v-if="taskNodes.length"> · {{ completedTaskCount }}/{{ taskNodes.length }} tasks closed</template>
-        </span>
+          · {{ completedTaskCount }}/{{ taskNodes.length }} tasks closed
+        </button>
+        <span v-else class="stats">{{ visibleNodes.length }} nodes · {{ visibleEdges.length }} relations</span>
         <button class="icon-button" type="button" :aria-label="dark ? 'Use light theme' : 'Use dark theme'" @click="toggleTheme">
           <Sun v-if="dark" :size="17" />
           <Moon v-else :size="17" />
@@ -434,11 +555,39 @@ onBeforeUnmount(() => simulation?.stop())
       </div>
     </header>
 
+    <Transition name="overview">
+      <aside v-if="overviewOpen" class="task-overview glass" aria-label="Task overview">
+        <header>
+          <div><BarChart3 :size="16" /><strong>Task overview</strong></div><button class="icon-button" type="button" aria-label="Close task overview" @click="overviewOpen = false">
+            <X :size="16" />
+          </button>
+        </header>
+        <div class="overview-metrics">
+          <div><span>Closed</span><strong>{{ completedTaskCount }} / {{ taskNodes.length }}</strong></div>
+          <div><span>Goals</span><strong>{{ taskGoalProgress.achieved }} / {{ taskGoalProgress.total }}</strong></div>
+          <div><span>Milestones</span><strong>{{ milestoneCount }}</strong></div>
+          <div><span>Stages</span><strong>{{ workflowStages.length }}</strong></div>
+        </div>
+        <section>
+          <span class="overview-label">Status distribution</span>
+          <button v-for="status in workflowStatuses" :key="status" type="button" class="overview-row" @click="isolateStatus(status)">
+            <span class="type-dot" :style="{ background: statusColor(status) }" /><span>{{ statusLabel(status) }}</span><strong>{{ statusCount(status) }}</strong>
+          </button>
+        </section>
+        <section>
+          <span class="overview-label">Current stages</span>
+          <button v-for="stage in workflowStages" :key="stage" type="button" class="overview-row" @click="isolateStage(stage)">
+            <span class="stage-mark" /><span>{{ stage }}</span><strong>{{ stageCount(stage) }}</strong>
+          </button>
+        </section>
+      </aside>
+    </Transition>
+
     <section class="workspace">
       <aside class="filters glass">
         <div class="panel-heading">
           <strong>Filters</strong>
-          <button v-if="hiddenTypes.size || hiddenRelations.size || hiddenStatuses.size || hiddenStages.size" type="button" class="text-button" @click="resetFilters">
+          <button v-if="hiddenTypes.size || hiddenRelations.size || hiddenStatuses.size || hiddenStages.size || onlyMilestones" type="button" class="text-button" @click="resetFilters">
             Reset
           </button>
         </div>
@@ -453,6 +602,12 @@ onBeforeUnmount(() => simulation?.stop())
         </div>
         <div v-if="workflowStatuses.length" class="filter-section">
           <span class="filter-label">Task status</span>
+          <label v-if="milestoneCount" class="filter-row">
+            <input v-model="onlyMilestones" type="checkbox">
+            <Flag class="milestone-filter-icon" :size="12" />
+            <span>Milestone focus</span>
+            <small>{{ milestoneCount }}</small>
+          </label>
           <label v-for="status in workflowStatuses" :key="status" class="filter-row">
             <input type="checkbox" :checked="!hiddenStatuses.has(status)" @change="toggleSet(hiddenStatuses, status)">
             <span class="type-dot status-dot" :style="{ background: statusColor(status) }" />
@@ -542,6 +697,7 @@ onBeforeUnmount(() => simulation?.stop())
             <span v-if="cardMode" class="node-copy">
               <span class="node-title-row">
                 <strong>{{ node.name }}</strong>
+                <Flag v-if="node.workflow?.milestone" class="node-milestone" :size="11" aria-label="Milestone" />
                 <span v-if="node.workflow" class="status-badge"><Check v-if="isCompleted(node)" :size="9" />{{ statusLabel(node.workflow.status) }}</span>
               </span>
               <small v-if="node.workflow?.stage" class="node-stage">Stage · {{ node.workflow.stage }}</small>
@@ -549,6 +705,11 @@ onBeforeUnmount(() => simulation?.stop())
               <span v-if="node.workflow && goalProgress(node).total" class="node-progress">
                 <span class="progress-track"><span :style="{ width: `${goalProgress(node).percent}%` }" /></span>
                 <small>{{ goalProgress(node).achieved }}/{{ goalProgress(node).total }}</small>
+              </span>
+              <span v-if="childProgress(node).total" class="node-progress child-progress">
+                <GitBranch :size="9" />
+                <span class="progress-track"><span :style="{ width: `${childProgress(node).percent}%` }" /></span>
+                <small>{{ childProgress(node).completed }}/{{ childProgress(node).total }}</small>
               </span>
             </span>
             <span v-if="!cardMode" class="dot-label">{{ node.name }}</span>
@@ -592,77 +753,136 @@ onBeforeUnmount(() => simulation?.stop())
           </header>
           <code class="entity-id">{{ selected.id }}</code>
 
-          <section v-if="selected.workflow" class="drawer-section workflow-section">
-            <h2>Task overview</h2>
-            <div class="workflow-summary">
-              <div>
-                <span>Status</span>
-                <strong class="summary-status" :style="{ '--status-color': statusColor(selected.workflow.status) }">
-                  <span />{{ statusLabel(selected.workflow.status) }}
-                </strong>
-              </div>
-              <div>
-                <span>Current stage</span>
-                <strong>{{ selected.workflow.stage || 'Unstaged' }}</strong>
-              </div>
-              <div>
-                <span>Goal progress</span>
-                <strong>{{ goalProgress(selected).achieved }} / {{ goalProgress(selected).total }}</strong>
-              </div>
-              <div v-if="selected.workflow.milestone">
-                <span>Marker</span>
-                <strong class="milestone-label"><Flag :size="12" /> Milestone</strong>
-              </div>
-              <div v-if="selected.workflow.completedAt">
-                <span>Completed at</span>
-                <strong>{{ selected.workflow.completedAt }}</strong>
-              </div>
-            </div>
-            <div v-if="goalProgress(selected).total" class="drawer-progress">
-              <span :style="{ width: `${goalProgress(selected).percent}%` }" />
-            </div>
-          </section>
-
-          <section v-if="selectedGoals.length" class="drawer-section">
-            <h2>Goals <span>{{ selectedGoals.length }}</span></h2>
-            <div class="goal-list">
-              <div v-for="goal in selectedGoals" :key="goal.id" class="goal-row" :class="`goal-${goal.status}`">
-                <span class="goal-check"><Check v-if="goal.status === 'achieved'" :size="12" /></span>
-                <span><strong>{{ goal.text }}</strong><small>{{ goal.stage || 'Overall' }}</small></span>
-              </div>
-            </div>
-          </section>
-
-          <section v-if="Object.keys(selectedProperties).length" class="drawer-section">
-            <h2>Properties</h2>
-            <dl class="properties">
-              <template v-for="(value, key) in selectedProperties" :key="key">
-                <dt>{{ key }}</dt><dd>{{ formatProperty(value) }}</dd>
-              </template>
-            </dl>
-          </section>
-
-          <section class="drawer-section">
-            <h2>Incoming <span>{{ incoming.length }}</span></h2>
-            <div v-if="!incoming.length" class="empty-list">
-              No incoming relationships
-            </div>
-            <button v-for="edge in incoming" :key="edge.id" type="button" class="relation-row" @click="selectNode(edge.source, true)">
-              <span class="relation-direction"><ArrowLeft :size="15" /></span>
-              <span><strong>{{ relatedNode(edge, 'in')?.name ?? edge.source }}</strong><small>{{ edge.relation }}</small></span>
+          <nav class="drawer-tabs" aria-label="Entity detail sections">
+            <button type="button" :class="{ active: drawerTab === 'overview' }" @click="drawerTab = 'overview'">
+              Overview
             </button>
-          </section>
-
-          <section class="drawer-section">
-            <h2>Outgoing <span>{{ outgoing.length }}</span></h2>
-            <div v-if="!outgoing.length" class="empty-list">
-              No outgoing relationships
-            </div>
-            <button v-for="edge in outgoing" :key="edge.id" type="button" class="relation-row" @click="selectNode(edge.target, true)">
-              <span class="relation-direction"><ArrowRight :size="15" /></span>
-              <span><strong>{{ relatedNode(edge, 'out')?.name ?? edge.target }}</strong><small>{{ edge.relation }}</small></span>
+            <button v-if="selected.workflow" type="button" :class="{ active: drawerTab === 'journey' }" @click="drawerTab = 'journey'">
+              Journey
             </button>
-          </section>
+            <button type="button" :class="{ active: drawerTab === 'relations' }" @click="drawerTab = 'relations'">
+              Relations
+            </button>
+          </nav>
+
+          <template v-if="drawerTab === 'overview'">
+            <section v-if="selected.workflow" class="drawer-section workflow-section">
+              <h2>Task overview</h2>
+              <div class="workflow-summary">
+                <div>
+                  <span>Status</span>
+                  <strong class="summary-status" :style="{ '--status-color': statusColor(selected.workflow.status) }">
+                    <span />{{ statusLabel(selected.workflow.status) }}
+                  </strong>
+                </div>
+                <div>
+                  <span>Current stage</span>
+                  <strong>{{ selected.workflow.stage || 'Unstaged' }}</strong>
+                </div>
+                <div>
+                  <span>Goal progress</span>
+                  <strong>{{ goalProgress(selected).achieved }} / {{ goalProgress(selected).total }}</strong>
+                </div>
+                <div v-if="selectedChildProgress.total">
+                  <span>Child tasks closed</span>
+                  <strong>{{ selectedChildProgress.completed }} / {{ selectedChildProgress.total }}</strong>
+                </div>
+                <div v-if="selected.workflow.milestone">
+                  <span>Marker</span>
+                  <strong class="milestone-label"><Flag :size="12" /> Milestone</strong>
+                </div>
+                <div v-if="selected.workflow.completedAt">
+                  <span>Completed at</span>
+                  <strong>{{ formatDateTime(selected.workflow.completedAt) }}</strong>
+                </div>
+              </div>
+              <div v-if="goalProgress(selected).total" class="drawer-progress">
+                <span :style="{ width: `${goalProgress(selected).percent}%` }" />
+              </div>
+            </section>
+
+            <section v-if="selectedGoals.length" class="drawer-section">
+              <h2>Goals <span>{{ selectedGoals.length }}</span></h2>
+              <div class="goal-list">
+                <div v-for="goal in selectedGoals" :key="goal.id" class="goal-row" :class="`goal-${goal.status}`">
+                  <span class="goal-check"><Check v-if="goal.status === 'achieved'" :size="12" /></span>
+                  <span><strong>{{ goal.text }}</strong><small>{{ goal.stage || 'Overall' }}</small></span>
+                </div>
+              </div>
+            </section>
+
+            <section v-if="selectedChildren.length" class="drawer-section">
+              <h2>Child tasks <span>{{ selectedChildren.length }}</span></h2>
+              <div class="child-summary">
+                <span :style="{ width: `${selectedChildProgress.total ? selectedChildProgress.completed / selectedChildProgress.total * 100 : 0}%` }" />
+              </div>
+              <button v-for="child in selectedChildren" :key="child.id" type="button" class="child-row" @click="selectNode(child.id, true)">
+                <span class="child-status" :style="{ background: statusColor(child.workflow?.status) }" />
+                <span><strong>{{ child.name }}</strong><small>{{ statusLabel(child.workflow?.status) }} · {{ child.workflow?.stage || 'Unstaged' }}</small></span>
+              </button>
+            </section>
+
+            <section v-if="Object.keys(selectedProperties).length" class="drawer-section">
+              <h2>Properties</h2>
+              <dl class="properties">
+                <template v-for="(value, key) in selectedProperties" :key="key">
+                  <dt>{{ key }}</dt><dd>{{ formatProperty(value) }}</dd>
+                </template>
+              </dl>
+            </section>
+          </template>
+
+          <template v-if="drawerTab === 'journey' && selected.workflow">
+            <section class="drawer-section">
+              <h2>Stage timeline <span>{{ selectedStages.length }}</span></h2>
+              <div v-if="!selectedStages.length" class="empty-list">
+                No named stages yet
+              </div>
+              <div v-else class="stage-timeline">
+                <div v-for="stage in selectedStages" :key="stage.name" class="stage-step" :class="{ current: stage.current }">
+                  <span class="stage-node"><Check v-if="!stage.current && stage.total && stage.achieved === stage.total" :size="11" /><Clock3 v-else :size="11" /></span>
+                  <div><strong>{{ stage.name }}</strong><small>{{ stage.current ? 'Current stage' : formatDateTime(stage.at) }}<template v-if="stage.total"> · {{ stage.achieved }}/{{ stage.total }} goals</template></small></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="drawer-section">
+              <h2>Activity <span>{{ selectedHistory.length }}</span></h2>
+              <div v-if="!selectedHistory.length" class="empty-list">
+                No workflow history
+              </div>
+              <div v-else class="history-list">
+                <div v-for="entry in selectedHistory" :key="entry.id" class="history-row">
+                  <span class="history-kind">{{ entry.kind }}</span>
+                  <div><strong>{{ entry.text }}</strong><small>{{ formatDateTime(entry.at) }}</small></div>
+                </div>
+              </div>
+            </section>
+          </template>
+
+          <template v-if="drawerTab === 'relations'">
+            <section class="drawer-section">
+              <h2>Incoming <span>{{ incoming.length }}</span></h2>
+              <div v-if="!incoming.length" class="empty-list">
+                No incoming relationships
+              </div>
+              <button v-for="edge in incoming" :key="edge.id" type="button" class="relation-row" @click="selectNode(edge.source, true)">
+                <span class="relation-direction"><ArrowLeft :size="15" /></span>
+                <span><strong>{{ relatedNode(edge, 'in')?.name ?? edge.source }}</strong><small>{{ edge.relation }}</small></span>
+              </button>
+            </section>
+
+            <section class="drawer-section">
+              <h2>Outgoing <span>{{ outgoing.length }}</span></h2>
+              <div v-if="!outgoing.length" class="empty-list">
+                No outgoing relationships
+              </div>
+              <button v-for="edge in outgoing" :key="edge.id" type="button" class="relation-row" @click="selectNode(edge.target, true)">
+                <span class="relation-direction"><ArrowRight :size="15" /></span>
+                <span><strong>{{ relatedNode(edge, 'out')?.name ?? edge.target }}</strong><small>{{ edge.relation }}</small></span>
+              </button>
+            </section>
+          </template>
         </aside>
       </Transition>
     </section>

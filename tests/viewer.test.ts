@@ -52,6 +52,9 @@ describe('ontology viewer', () => {
         goals: [
           { id: 'goal-1', text: 'Build UI', status: 'achieved', scope: 'stage', stage: 'implementation' },
           { id: 'goal-2', text: 'Verify UI', status: 'pending', scope: 'stage', stage: 'verification' }
+        ],
+        history: [
+          { id: 'history-1', at: '2026-01-01T00:00:00.000Z', kind: 'stage', text: 'Enter verification', from: 'implementation', to: 'verification' }
         ]
       }]
     ]).getGraph()
@@ -64,6 +67,9 @@ describe('ontology viewer', () => {
       goals: [
         { id: 'goal-1', text: 'Build UI', status: 'achieved', scope: 'stage', stage: 'implementation' },
         { id: 'goal-2', text: 'Verify UI', status: 'pending', scope: 'stage', stage: 'verification' }
+      ],
+      history: [
+        { id: 'history-1', at: '2026-01-01T00:00:00.000Z', kind: 'stage', text: 'Enter verification', from: 'implementation', to: 'verification', stage: undefined }
       ]
     })
   })
