@@ -6,24 +6,20 @@ import {
   ArrowRight,
   BarChart3,
   Check,
-  CircleDot,
   Clock3,
   Flag,
-  Focus,
   GitBranch,
   Moon,
   Network,
-  RefreshCcw,
-  RefreshCw,
   Search,
-  Square,
   Sun,
-  X,
-  ZoomIn,
-  ZoomOut
+  X
 } from '@lucide/vue'
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY } from 'd3-force'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import GraphControls from './components/GraphControls.vue'
+import GraphFilters from './components/GraphFilters.vue'
+import TaskOverview from './components/TaskOverview.vue'
 import { wheelZoomFactor } from './zoom'
 
 interface Point { x: number, y: number }
@@ -556,84 +552,48 @@ onBeforeUnmount(() => simulation?.stop())
     </header>
 
     <Transition name="overview">
-      <aside v-if="overviewOpen" class="task-overview glass" aria-label="Task overview">
-        <header>
-          <div><BarChart3 :size="16" /><strong>Task overview</strong></div><button class="icon-button" type="button" aria-label="Close task overview" @click="overviewOpen = false">
-            <X :size="16" />
-          </button>
-        </header>
-        <div class="overview-metrics">
-          <div><span>Closed</span><strong>{{ completedTaskCount }} / {{ taskNodes.length }}</strong></div>
-          <div><span>Goals</span><strong>{{ taskGoalProgress.achieved }} / {{ taskGoalProgress.total }}</strong></div>
-          <div><span>Milestones</span><strong>{{ milestoneCount }}</strong></div>
-          <div><span>Stages</span><strong>{{ workflowStages.length }}</strong></div>
-        </div>
-        <section>
-          <span class="overview-label">Status distribution</span>
-          <button v-for="status in workflowStatuses" :key="status" type="button" class="overview-row" @click="isolateStatus(status)">
-            <span class="type-dot" :style="{ background: statusColor(status) }" /><span>{{ statusLabel(status) }}</span><strong>{{ statusCount(status) }}</strong>
-          </button>
-        </section>
-        <section>
-          <span class="overview-label">Current stages</span>
-          <button v-for="stage in workflowStages" :key="stage" type="button" class="overview-row" @click="isolateStage(stage)">
-            <span class="stage-mark" /><span>{{ stage }}</span><strong>{{ stageCount(stage) }}</strong>
-          </button>
-        </section>
-      </aside>
+      <TaskOverview
+        v-if="overviewOpen"
+        :completed-task-count="completedTaskCount"
+        :task-count="taskNodes.length"
+        :achieved-goal-count="taskGoalProgress.achieved"
+        :goal-count="taskGoalProgress.total"
+        :milestone-count="milestoneCount"
+        :workflow-statuses="workflowStatuses"
+        :workflow-stages="workflowStages"
+        :status-color="statusColor"
+        :status-label="statusLabel"
+        :status-count="statusCount"
+        :stage-count="stageCount"
+        @close="overviewOpen = false"
+        @isolate-status="isolateStatus"
+        @isolate-stage="isolateStage"
+      />
     </Transition>
 
     <section class="workspace">
-      <aside class="filters glass">
-        <div class="panel-heading">
-          <strong>Filters</strong>
-          <button v-if="hiddenTypes.size || hiddenRelations.size || hiddenStatuses.size || hiddenStages.size || onlyMilestones" type="button" class="text-button" @click="resetFilters">
-            Reset
-          </button>
-        </div>
-        <div class="filter-section">
-          <span class="filter-label">Entity types</span>
-          <label v-for="type in graph?.entityTypes" :key="type" class="filter-row">
-            <input type="checkbox" :checked="!hiddenTypes.has(type)" @change="toggleSet(hiddenTypes, type)">
-            <span class="type-dot" :style="{ background: colorFor(type) }" />
-            <span>{{ type }}</span>
-            <small>{{ nodes.filter(node => node.type === type).length }}</small>
-          </label>
-        </div>
-        <div v-if="workflowStatuses.length" class="filter-section">
-          <span class="filter-label">Task status</span>
-          <label v-if="milestoneCount" class="filter-row">
-            <input v-model="onlyMilestones" type="checkbox">
-            <Flag class="milestone-filter-icon" :size="12" />
-            <span>Milestone focus</span>
-            <small>{{ milestoneCount }}</small>
-          </label>
-          <label v-for="status in workflowStatuses" :key="status" class="filter-row">
-            <input type="checkbox" :checked="!hiddenStatuses.has(status)" @change="toggleSet(hiddenStatuses, status)">
-            <span class="type-dot status-dot" :style="{ background: statusColor(status) }" />
-            <span>{{ statusLabel(status) }}</span>
-            <small>{{ statusCount(status) }}</small>
-          </label>
-        </div>
-        <div v-if="workflowStages.length" class="filter-section">
-          <span class="filter-label">Current stage</span>
-          <label v-for="stage in workflowStages" :key="stage" class="filter-row">
-            <input type="checkbox" :checked="!hiddenStages.has(stage)" @change="toggleSet(hiddenStages, stage)">
-            <span class="stage-mark" />
-            <span :title="stage">{{ stage }}</span>
-            <small>{{ stageCount(stage) }}</small>
-          </label>
-        </div>
-        <div class="filter-section relation-filters">
-          <span class="filter-label">Relations</span>
-          <label v-for="relation in graph?.relationTypes" :key="relation" class="filter-row">
-            <input type="checkbox" :checked="!hiddenRelations.has(relation)" @change="toggleSet(hiddenRelations, relation)">
-            <span class="relation-swatch" />
-            <span :title="relation">{{ relation }}</span>
-            <small>{{ graph?.edges.filter(edge => edge.relation === relation).length }}</small>
-          </label>
-        </div>
-      </aside>
+      <GraphFilters
+        v-model:only-milestones="onlyMilestones"
+        :graph="graph"
+        :nodes="nodes"
+        :hidden-types="hiddenTypes"
+        :hidden-relations="hiddenRelations"
+        :hidden-statuses="hiddenStatuses"
+        :hidden-stages="hiddenStages"
+        :workflow-statuses="workflowStatuses"
+        :workflow-stages="workflowStages"
+        :milestone-count="milestoneCount"
+        :color-for="colorFor"
+        :status-color="statusColor"
+        :status-label="statusLabel"
+        :status-count="statusCount"
+        :stage-count="stageCount"
+        @reset="resetFilters"
+        @toggle-type="toggleSet(hiddenTypes, $event)"
+        @toggle-relation="toggleSet(hiddenRelations, $event)"
+        @toggle-status="toggleSet(hiddenStatuses, $event)"
+        @toggle-stage="toggleSet(hiddenStages, $event)"
+      />
 
       <div
         ref="canvas"
@@ -716,28 +676,15 @@ onBeforeUnmount(() => simulation?.stop())
           </button>
         </div>
 
-        <div class="toolbar glass" aria-label="Graph controls">
-          <button type="button" title="Zoom out" aria-label="Zoom out" @click="zoomAt(0.89)">
-            <ZoomOut :size="17" />
-          </button>
-          <button type="button" title="Fit graph" aria-label="Fit graph" @click="fitGraph">
-            <Focus :size="17" />
-          </button>
-          <button type="button" title="Zoom in" aria-label="Zoom in" @click="zoomAt(1.12)">
-            <ZoomIn :size="17" />
-          </button>
-          <span class="toolbar-divider" />
-          <button type="button" :class="{ active: !cardMode }" :title="cardMode ? 'Use dot nodes' : 'Use card nodes'" :aria-label="cardMode ? 'Use dot nodes' : 'Use card nodes'" @click="toggleMode">
-            <CircleDot v-if="cardMode" :size="17" />
-            <Square v-else :size="17" />
-          </button>
-          <button type="button" title="Reorganize graph" aria-label="Reorganize graph" @click="resetLayout">
-            <RefreshCcw :size="17" />
-          </button>
-          <button type="button" title="Reload data" aria-label="Reload data" @click="loadGraph">
-            <RefreshCw :size="17" />
-          </button>
-        </div>
+        <GraphControls
+          :card-mode="cardMode"
+          @zoom-out="zoomAt(0.89)"
+          @fit="fitGraph"
+          @zoom-in="zoomAt(1.12)"
+          @toggle-mode="toggleMode"
+          @reset="resetLayout"
+          @reload="loadGraph"
+        />
       </div>
 
       <Transition name="drawer">
