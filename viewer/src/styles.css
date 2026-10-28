@@ -4,7 +4,7 @@
   color: #20232d;
   background: #f6f7fb;
   --bg: #f6f7fb;
-  --surface: rgb(255 255 255 / 92%);
+  --surface: rgb(255 255 255 / 90%);
   --surface-solid: #fff;
   --surface-hover: rgb(103 80 216 / 7%);
   --border: rgb(20 24 35 / 10%);
@@ -23,7 +23,7 @@
   color: #ececf2;
   background: #111319;
   --bg: #111319;
-  --surface: rgb(22 24 31 / 90%);
+  --surface: rgb(23 23 23 / 92%);
   --surface-solid: #1b1d26;
   --surface-hover: rgb(169 155 255 / 9%);
   --border: rgb(255 255 255 / 10%);
@@ -46,8 +46,8 @@ button { color: inherit; }
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(42px) saturate(.8);
-  -webkit-backdrop-filter: blur(42px) saturate(.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .app-shell { height: 100%; background-color: var(--bg); background-image: radial-gradient(var(--border) 1px, transparent 1px); background-size: 18px 18px; }
