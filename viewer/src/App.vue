@@ -58,6 +58,7 @@ const canvas = ref<HTMLElement | null>(null)
 const positionsVersion = ref(0)
 let simulation: Simulation<LayoutNode, LayoutLink> | null = null
 let panStart: Point | null = null
+let panOrigin: Point | null = null
 let dragNode: LayoutNode | null = null
 
 const graphIndex = computed(() => buildGraphIndex(nodes.value, graph.value?.edges ?? []))
@@ -545,9 +546,11 @@ function endNodeDrag(event: PointerEvent, node: LayoutNode): void {
 
 function startPan(event: PointerEvent): void {
   const element = canvas.value
-  if (!element || event.target !== element)
+  const target = event.target as Element
+  if (!element || target.closest('.graph-node, .toolbar, .center-state, .error-toast'))
     return
   panStart = { x: event.clientX - transform.x, y: event.clientY - transform.y }
+  panOrigin = { x: event.clientX, y: event.clientY }
   element.setPointerCapture(event.pointerId)
 }
 
@@ -561,8 +564,14 @@ function movePan(event: PointerEvent): void {
 function endPan(event: PointerEvent): void {
   if (!panStart)
     return
+  const moved = panOrigin
+    ? Math.hypot(event.clientX - panOrigin.x, event.clientY - panOrigin.y) > 4
+    : false
   panStart = null
+  panOrigin = null
   canvas.value?.releasePointerCapture(event.pointerId)
+  if (!moved && event.type !== 'pointercancel')
+    clearSelection()
 }
 
 function zoomAt(delta: number, clientX?: number, clientY?: number): void {
@@ -678,7 +687,7 @@ onBeforeUnmount(() => simulation?.stop())
         @pointerup="endPan"
         @pointercancel="endPan"
         @wheel="onWheel"
-        @dblclick.self="clearSelection"
+        @dblclick.prevent
       >
         <div v-if="loading" class="center-state glass">
           <span class="spinner" />Loading graph…

@@ -86,7 +86,7 @@ button { color: inherit; }
 .overview-enter-active, .overview-leave-active { transition: transform .16s ease, opacity .14s ease; }
 .overview-enter-from, .overview-leave-to { opacity: 0; transform: translateY(-8px); }
 
-.workspace { position: relative; height: 100%; padding-top: 86px; }
+.workspace { position: fixed; inset: 0; }
 .filters { position: absolute; z-index: 30; top: 86px; bottom: 14px; left: 14px; width: 230px; overflow: auto; padding: 16px 12px; border-radius: 17px; scrollbar-width: thin; }
 .panel-heading { display: flex; justify-content: space-between; align-items: center; padding: 0 4px 14px; }
 .panel-heading strong { font-size: 14px; }
@@ -104,7 +104,7 @@ button { color: inherit; }
 .milestone-filter-icon { color: var(--primary); }
 .relation-swatch { width: 10px; height: 2px; border-radius: 1px; background: var(--muted); }
 
-.graph-canvas { position: absolute; inset: 86px 14px 14px 258px; overflow: hidden; border-radius: 19px; touch-action: none; cursor: grab; }
+.graph-canvas { position: absolute; z-index: 0; inset: 0; overflow: hidden; touch-action: none; cursor: grab; user-select: none; }
 .graph-canvas.panning { cursor: grabbing; }
 .world { position: absolute; top: 0; left: 0; width: 1px; height: 1px; transform-origin: 0 0; will-change: transform; }
 .edges { position: absolute; inset: -5000px; width: 10000px; height: 10000px; overflow: visible; pointer-events: none; }
@@ -229,16 +229,13 @@ button { color: inherit; }
   .brand div, .stats { display: none; }
   .stats-button { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; font-size: 0; }
   .filters { width: 190px; }
-  .graph-canvas { left: 218px; }
   .relation-drawer { width: min(380px, calc(100vw - 234px)); }
 }
 
 @media (max-width: 620px) {
   .topbar { left: 8px; right: 8px; top: 8px; height: 54px; grid-template-columns: auto 1fr auto; gap: 8px; }
   .brand-mark { width: 32px; height: 32px; }
-  .workspace { padding-top: 70px; }
   .filters { display: none; }
-  .graph-canvas { inset: 70px 8px 8px; }
   .relation-drawer { position: fixed; inset: auto 8px 8px; width: auto; max-height: 72vh; border-radius: 18px; }
 }
 
