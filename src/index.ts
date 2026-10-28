@@ -183,13 +183,15 @@ cli
   .option('--port <port>', 'Viewer port', { default: 0 })
   .option('--no-open', 'Do not open a browser')
   .option('--focus <entity-id>', 'Select an entity when the viewer opens')
+  .option('--config <file>', 'Viewer configuration file')
   .action(async (options) => {
     await inspectGraph({
       dataDir: options.dataDir,
       host: options.host,
       port: Number(options.port),
       open: options.open,
-      focus: options.focus
+      focus: options.focus,
+      configPath: options.config
     })
   })
 

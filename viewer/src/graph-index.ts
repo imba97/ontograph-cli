@@ -20,7 +20,7 @@ export interface GraphIndex<TNode extends ViewerNode = ViewerNode> {
 const EMPTY_PROGRESS: ProgressSummary = { achieved: 0, completed: 0, total: 0, percent: 0, cancelled: 0 }
 
 export function isCompletedNode(node: ViewerNode): boolean {
-  return ['done', 'completed', 'closed'].includes(node.workflow?.status?.toLocaleLowerCase() ?? '')
+  return node.workflow?.completed ?? false
 }
 
 export function emptyProgress(): ProgressSummary {
@@ -33,6 +33,7 @@ export function buildGraphIndex<TNode extends ViewerNode>(nodes: TNode[], edges:
   const outgoingByNodeId = new Map<string, ViewerEdge[]>()
   const childIdsByParentId = new Map<string, string[]>()
   const goalProgressByNodeId = new Map<string, ProgressSummary>()
+  const hierarchies = [...new Map(nodes.flatMap(node => node.workflow?.hierarchy ? [[node.workflow.key, node.workflow.hierarchy] as const] : [])).values()]
 
   for (const edge of edges) {
     const incoming = incomingByNodeId.get(edge.target) ?? []
@@ -43,10 +44,13 @@ export function buildGraphIndex<TNode extends ViewerNode>(nodes: TNode[], edges:
     outgoing.push(edge)
     outgoingByNodeId.set(edge.source, outgoing)
 
-    if (edge.relation === 'child_of') {
-      const childIds = childIdsByParentId.get(edge.target) ?? []
-      childIds.push(edge.source)
-      childIdsByParentId.set(edge.target, childIds)
+    const hierarchy = hierarchies.find(value => value.relation === edge.relation)
+    if (hierarchy) {
+      const parentId = hierarchy.direction === 'child-to-parent' ? edge.target : edge.source
+      const childId = hierarchy.direction === 'child-to-parent' ? edge.source : edge.target
+      const childIds = childIdsByParentId.get(parentId) ?? []
+      childIds.push(childId)
+      childIdsByParentId.set(parentId, childIds)
     }
   }
 

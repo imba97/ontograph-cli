@@ -10,7 +10,14 @@ function task(id: string, status: string, goals: NonNullable<ViewerNode['workflo
     properties: {},
     incomingCount: 0,
     outgoingCount: 0,
-    workflow: { status, goals, history: [] }
+    workflow: {
+      key: 'task',
+      status,
+      completed: status === 'done',
+      goals,
+      history: [],
+      hierarchy: { relation: 'child_of', direction: 'child-to-parent' }
+    }
   }
 }
 

@@ -8,6 +8,7 @@ export interface InspectOptions {
   port?: number
   open?: boolean
   focus?: string
+  configPath?: string
 }
 
 export async function inspectGraph(options: InspectOptions): Promise<void> {

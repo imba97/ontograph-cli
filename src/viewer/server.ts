@@ -5,6 +5,7 @@ import { createServer } from 'node:http'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { OntologyStore } from '../store'
+import { loadViewerConfig } from './config'
 import { projectViewerGraph } from './projection'
 
 export interface ViewerServerOptions {
@@ -12,6 +13,7 @@ export interface ViewerServerOptions {
   host?: string
   port?: number
   assetsDir?: string
+  configPath?: string
 }
 
 export interface ViewerServer {
@@ -42,6 +44,7 @@ function sendJson(response: import('node:http').ServerResponse, status: number, 
 export async function startViewerServer(options: ViewerServerOptions): Promise<ViewerServer> {
   const host = options.host ?? '127.0.0.1'
   const assetsDir = path.resolve(options.assetsDir ?? defaultAssetsDir())
+  const viewerConfig = loadViewerConfig(options.dataDir, options.configPath)
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', `http://${request.headers.host ?? host}`)
 
@@ -53,11 +56,16 @@ export async function startViewerServer(options: ViewerServerOptions): Promise<V
     if (url.pathname === '/api/graph') {
       try {
         const store = new OntologyStore({ dataDir: options.dataDir, readOnly: true, strict: true })
-        sendJson(response, 200, projectViewerGraph(store.getGraph()))
+        sendJson(response, 200, projectViewerGraph(store.getGraph(), undefined, viewerConfig))
       }
       catch (error) {
         sendJson(response, 500, { error: error instanceof Error ? error.message : String(error) })
       }
+      return
+    }
+
+    if (url.pathname === '/api/config') {
+      sendJson(response, 200, viewerConfig)
       return
     }
 

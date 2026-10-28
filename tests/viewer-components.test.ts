@@ -58,6 +58,8 @@ describe('viewer filters', () => {
         milestoneCount: 1,
         onlyMilestones: false,
         colorFor: () => '#000',
+        entityLabel: (type: string) => type,
+        relationLabel: (relation: string) => relation,
         statusColor: () => '#111',
         statusLabel: (status?: string) => status ?? '',
         statusCount: () => 1,

@@ -1,4 +1,6 @@
 import type { Entity, Graph } from '../types'
+import type { ViewerConfig, ViewerWorkflowConfig } from './config'
+import { DEFAULT_VIEWER_CONFIG, matchConfiguredRule } from './config'
 
 export interface ViewerNode {
   id: string
@@ -19,12 +21,17 @@ export interface ViewerGoal {
 }
 
 export interface ViewerWorkflow {
+  key: string
   status?: string
+  statusLabel?: string
+  statusColor?: string
+  completed: boolean
   stage?: string | null
   completedAt?: string | null
   milestone?: boolean
   goals: ViewerGoal[]
   history: ViewerHistory[]
+  hierarchy?: ViewerWorkflowConfig['hierarchy']
 }
 
 export interface ViewerHistory {
@@ -61,19 +68,20 @@ function safeProperties(entity: Entity): Record<string, unknown> {
   )
 }
 
-function projectWorkflow(entity: Entity): ViewerWorkflow | undefined {
-  const hasWorkflow = typeof entity.status === 'string'
-    || typeof entity.stage === 'string'
-    || entity.stage === null
-    || Array.isArray(entity.goals)
-    || typeof entity.completedAt === 'string'
-    || typeof entity.milestone === 'boolean'
-
-  if (!hasWorkflow)
+function projectWorkflow(entity: Entity, config: ViewerConfig): ViewerWorkflow | undefined {
+  const workflowEntry = Object.entries(config.workflows).find(([, workflow]) => workflow.entityTypes.includes(entity.type))
+  if (!workflowEntry)
     return undefined
+  const [key, workflow] = workflowEntry
+  const status = entity[workflow.fields.status]
+  const stage = workflow.fields.stage ? entity[workflow.fields.stage] : undefined
+  const goalsValue = workflow.fields.goals ? entity[workflow.fields.goals] : undefined
+  const historyValue = workflow.fields.history ? entity[workflow.fields.history] : undefined
+  const milestone = workflow.fields.milestone ? entity[workflow.fields.milestone] : undefined
+  const completedAt = workflow.fields.completedAt ? entity[workflow.fields.completedAt] : undefined
 
-  const goals = Array.isArray(entity.goals)
-    ? entity.goals.flatMap((goal, index) => {
+  const goals = Array.isArray(goalsValue)
+    ? goalsValue.flatMap((goal, index) => {
         if (!goal || typeof goal !== 'object')
           return []
         const value = goal as Record<string, unknown>
@@ -89,8 +97,8 @@ function projectWorkflow(entity: Entity): ViewerWorkflow | undefined {
       })
     : []
 
-  const history = Array.isArray(entity.history)
-    ? entity.history.flatMap((entry, index) => {
+  const history = Array.isArray(historyValue)
+    ? historyValue.flatMap((entry, index) => {
         if (!entry || typeof entry !== 'object')
           return []
         const value = entry as Record<string, unknown>
@@ -109,16 +117,21 @@ function projectWorkflow(entity: Entity): ViewerWorkflow | undefined {
     : []
 
   return {
-    status: typeof entity.status === 'string' ? entity.status : undefined,
-    stage: typeof entity.stage === 'string' || entity.stage === null ? entity.stage : undefined,
-    completedAt: typeof entity.completedAt === 'string' || entity.completedAt === null ? entity.completedAt : undefined,
-    milestone: typeof entity.milestone === 'boolean' ? entity.milestone : undefined,
+    key,
+    status: typeof status === 'string' ? status : undefined,
+    statusLabel: typeof status === 'string' ? workflow.statuses[status]?.label : undefined,
+    statusColor: typeof status === 'string' ? workflow.statuses[status]?.color : undefined,
+    completed: typeof status === 'string' ? workflow.statuses[status]?.completed ?? false : false,
+    stage: typeof stage === 'string' || stage === null ? stage : undefined,
+    completedAt: typeof completedAt === 'string' || completedAt === null ? completedAt : undefined,
+    milestone: typeof milestone === 'boolean' ? milestone : undefined,
     goals,
-    history
+    history,
+    hierarchy: workflow.hierarchy
   }
 }
 
-export function projectViewerGraph(graph: Graph, generatedAt = new Date().toISOString()): ViewerGraph {
+export function projectViewerGraph(graph: Graph, generatedAt = new Date().toISOString(), config: ViewerConfig = DEFAULT_VIEWER_CONFIG): ViewerGraph {
   const incoming = new Map<string, number>()
   const outgoing = new Map<string, number>()
 
@@ -136,7 +149,7 @@ export function projectViewerGraph(graph: Graph, generatedAt = new Date().toISOS
       properties: safeProperties(entity),
       incomingCount: incoming.get(id) ?? 0,
       outgoingCount: outgoing.get(id) ?? 0,
-      workflow: projectWorkflow(entity)
+      workflow: projectWorkflow(entity, config)
     }))
 
   const duplicateCounts = new Map<string, number>()
@@ -150,7 +163,7 @@ export function projectViewerGraph(graph: Graph, generatedAt = new Date().toISOS
         source: relation.from,
         target: relation.to,
         relation: relation.rel,
-        label: relation.rel
+        label: matchConfiguredRule(config.relations, relation.rel)?.label ?? relation.rel
       }
     })
     .sort((left, right) => left.id.localeCompare(right.id))

@@ -39,10 +39,12 @@ ontograph inspect
 `ontograph inspect` starts a local read-only relationship viewer and opens it in your browser. It uses a force-directed graph rather than a hierarchy, so connected entities form natural clusters without requiring a root node.
 
 ```bash
-ontograph inspect [--data-dir <dir>] [--port <port>] [--host <address>] [--no-open] [--focus <entity-id>]
+ontograph inspect [--data-dir <dir>] [--config <file>] [--port <port>] [--host <address>] [--no-open] [--focus <entity-id>]
 ```
 
 The viewer supports search and type filters, card/dot node modes, pan and zoom, manual data reload, and a relationship drawer for the selected entity. It does not watch files, edit graph data, or generate an HTML artifact.
+
+The inspector automatically loads `<data-dir>/viewer.yaml` when present. Use `--config <file>` to select another file. This single versioned YAML file maps project-specific workflow fields, status semantics, entity presentation, relation visibility, and drawer components. Without it, the inspector stays a generic entity-relationship graph and does not assume task semantics.
 
 ## Data
 

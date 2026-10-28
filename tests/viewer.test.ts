@@ -1,3 +1,4 @@
+import type { ViewerConfig } from '../src/viewer/config'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -8,6 +9,21 @@ import { createStore, seedGraph } from './store/helpers'
 
 const servers: Array<{ close: () => Promise<void> }> = []
 const tempDirs: string[] = []
+const workflowConfig: ViewerConfig = {
+  version: 1,
+  viewer: { title: 'Tasks', defaultNodeMode: 'card' },
+  entities: {},
+  relations: {},
+  workflows: {
+    task: {
+      entityTypes: ['todo'],
+      fields: { status: 'status', stage: 'stage', goals: 'goals', history: 'history', milestone: 'milestone', completedAt: 'completedAt' },
+      hierarchy: { relation: 'child_of', direction: 'child-to-parent' },
+      statuses: { 'in-progress': { label: 'In progress', color: '#6750d8', completed: false } }
+    }
+  },
+  drawer: { tabs: [{ id: 'overview', label: 'Overview', when: 'always', components: [{ type: 'property-list' }] }] }
+}
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map(server => server.close()))
@@ -59,8 +75,12 @@ describe('ontology viewer', () => {
       }]
     ]).getGraph()
 
-    expect(projectViewerGraph(graph).nodes[0]?.workflow).toEqual({
+    expect(projectViewerGraph(graph, undefined, workflowConfig).nodes[0]?.workflow).toEqual({
+      key: 'task',
       status: 'in-progress',
+      statusLabel: 'In progress',
+      statusColor: '#6750d8',
+      completed: false,
       stage: 'verification',
       completedAt: null,
       milestone: true,
@@ -70,7 +90,8 @@ describe('ontology viewer', () => {
       ],
       history: [
         { id: 'history-1', at: '2026-01-01T00:00:00.000Z', kind: 'stage', text: 'Enter verification', from: 'implementation', to: 'verification', stage: undefined }
-      ]
+      ],
+      hierarchy: { relation: 'child_of', direction: 'child-to-parent' }
     })
   })
 
@@ -87,6 +108,10 @@ describe('ontology viewer', () => {
     const graphResponse = await fetch(`${viewer.url}/api/graph`)
     expect(graphResponse.status).toBe(200)
     expect(await graphResponse.json()).toMatchObject({ nodes: [{ name: 'Ada' }] })
+
+    const configResponse = await fetch(`${viewer.url}/api/config`)
+    expect(configResponse.status).toBe(200)
+    expect(await configResponse.json()).toMatchObject({ version: 1, viewer: { title: 'Ontograph' } })
 
     const writeResponse = await fetch(`${viewer.url}/api/graph`, { method: 'POST' })
     expect(writeResponse.status).toBe(405)

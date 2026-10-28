@@ -13,6 +13,8 @@ defineProps<{
   workflowStages: string[]
   milestoneCount: number
   colorFor: (type: string) => string
+  entityLabel: (type: string) => string
+  relationLabel: (relation: string) => string
   statusColor: (status?: string) => string
   statusLabel: (status?: string) => string
   statusCount: (status: string) => number
@@ -43,7 +45,7 @@ const onlyMilestones = defineModel<boolean>('onlyMilestones', { required: true }
       <label v-for="type in graph?.entityTypes" :key="type" class="filter-row">
         <input type="checkbox" :checked="!hiddenTypes.has(type)" @change="emit('toggleType', type)">
         <span class="type-dot" :style="{ background: colorFor(type) }" />
-        <span>{{ type }}</span>
+        <span>{{ entityLabel(type) }}</span>
         <small>{{ nodes.filter(node => node.type === type).length }}</small>
       </label>
     </div>
@@ -76,7 +78,7 @@ const onlyMilestones = defineModel<boolean>('onlyMilestones', { required: true }
       <label v-for="relation in graph?.relationTypes" :key="relation" class="filter-row">
         <input type="checkbox" :checked="!hiddenRelations.has(relation)" @change="emit('toggleRelation', relation)">
         <span class="relation-swatch" />
-        <span :title="relation">{{ relation }}</span>
+        <span :title="relation">{{ relationLabel(relation) }}</span>
         <small>{{ graph?.edges.filter(edge => edge.relation === relation).length }}</small>
       </label>
     </div>

@@ -1,18 +1,24 @@
 <script setup lang="ts">
 import type { Simulation, SimulationLinkDatum } from 'd3-force'
+import type { ViewerComponentType, ViewerConfig } from './config'
 import type { LayoutNode, ViewerEdge, ViewerGraph, ViewerNode } from './types'
 import {
   ArrowLeft,
   ArrowRight,
   BarChart3,
+  BookOpen,
   Check,
+  CircleCheck,
   Clock3,
   Flag,
+  FolderTree,
   GitBranch,
   Moon,
   Network,
   Search,
   Sun,
+  Tag,
+  User,
   X
 } from '@lucide/vue'
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY } from 'd3-force'
@@ -20,6 +26,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import GraphControls from './components/GraphControls.vue'
 import GraphFilters from './components/GraphFilters.vue'
 import TaskOverview from './components/TaskOverview.vue'
+import { matchConfiguredRule } from './config'
 import { buildGraphIndex, emptyProgress, isCompletedNode } from './graph-index'
 import { wheelZoomFactor } from './zoom'
 
@@ -29,13 +36,15 @@ interface LayoutLink extends SimulationLinkDatum<LayoutNode> { id: string }
 interface StageSummary { name: string, at?: string, current: boolean, achieved: number, total: number }
 
 const TYPE_COLORS = ['#7c6cf2', '#0ea5a4', '#e07a45', '#db5c95', '#3f83d1', '#8a9a44', '#b668db', '#60798c']
+const ENTITY_ICONS = { 'circle-check': CircleCheck, 'book-open': BookOpen, 'user': User, 'folder-tree': FolderTree, 'tag': Tag }
 const graph = ref<ViewerGraph | null>(null)
+const viewerConfig = ref<ViewerConfig | null>(null)
 const nodes = ref<LayoutNode[]>([])
 const loading = ref(true)
 const reloadError = ref('')
 const query = ref('')
 const selectedId = ref('')
-const drawerTab = ref<'overview' | 'journey' | 'relations'>('overview')
+const drawerTab = ref('overview')
 const overviewOpen = ref(false)
 const onlyMilestones = ref(false)
 const cardMode = ref(localStorage.getItem('ontograph-node-mode') !== 'dot')
@@ -54,12 +63,14 @@ let dragNode: LayoutNode | null = null
 const graphIndex = computed(() => buildGraphIndex(nodes.value, graph.value?.edges ?? []))
 const nodeById = computed(() => graphIndex.value.nodeById)
 const selected = computed(() => selectedId.value ? nodeById.value.get(selectedId.value) ?? null : null)
+const drawerTabs = computed(() => (viewerConfig.value?.drawer.tabs ?? []).filter(tab => tab.when === 'always' || Boolean(selected.value?.workflow)))
 const workflowNodes = computed(() => nodes.value.filter(node => node.workflow))
 const taskNodes = computed(() => workflowNodes.value.filter(isTaskNode))
 const workflowStatuses = computed(() => [...new Set(taskNodes.value.flatMap(node => node.workflow?.status ? [node.workflow.status] : []))].sort())
 const workflowStages = computed(() => [...new Set(taskNodes.value.map(node => node.workflow?.stage || 'Unstaged'))].sort())
 const completedTaskCount = computed(() => taskNodes.value.filter(node => isCompleted(node)).length)
 const milestoneCount = computed(() => taskNodes.value.filter(node => node.workflow?.milestone).length)
+const hierarchyRelations = computed(() => new Set(Object.values(viewerConfig.value?.workflows ?? {}).flatMap(workflow => workflow.hierarchy ? [workflow.hierarchy.relation] : [])))
 const taskGoalProgress = computed(() => {
   const goals = taskNodes.value.flatMap(node => node.workflow?.goals ?? [])
   const achieved = goals.filter(goal => goal.status === 'achieved').length
@@ -72,7 +83,7 @@ const milestoneContextIds = computed(() => {
   const milestoneIds = new Set(taskNodes.value.filter(node => node.workflow?.milestone).map(node => node.id))
   const ids = new Set(milestoneIds)
   for (const edge of graph.value?.edges ?? []) {
-    if (edge.relation !== 'child_of')
+    if (!hierarchyRelations.value.has(edge.relation))
       continue
     const source = nodeById.value.get(edge.source)
     const target = nodeById.value.get(edge.target)
@@ -111,7 +122,9 @@ const selectedProperties = computed(() => {
   if (!selected.value?.workflow)
     return selected.value?.properties ?? {}
   const workflowKeys = new Set(['status', 'stage', 'goals', 'history', 'completedAt', 'milestone'])
-  return Object.fromEntries(Object.entries(selected.value.properties).filter(([key]) => !workflowKeys.has(key)))
+  const entries = Object.entries(selected.value.properties).filter(([key]) => !workflowKeys.has(key))
+  const fields = viewerConfig.value?.drawer.tabs.find(tab => tab.id === drawerTab.value)?.components.find(component => component.type === 'property-list')?.fields
+  return Object.fromEntries(fields?.length ? entries.filter(([key]) => fields.includes(key)) : entries)
 })
 const selectedGoals = computed(() => {
   const workflow = selected.value?.workflow
@@ -172,11 +185,13 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 function statusLabel(status?: string): string {
-  return status ? STATUS_LABELS[status] ?? status : 'Unknown'
+  const node = taskNodes.value.find(candidate => candidate.workflow?.status === status)
+  return node?.workflow?.statusLabel ?? (status ? STATUS_LABELS[status] ?? status : 'Unknown')
 }
 
 function statusColor(status?: string): string {
-  return status ? STATUS_COLORS[status] ?? '#60798c' : '#8b8f9c'
+  const node = taskNodes.value.find(candidate => candidate.workflow?.status === status)
+  return node?.workflow?.statusColor ?? (status ? STATUS_COLORS[status] ?? '#60798c' : '#8b8f9c')
 }
 
 function statusCount(status: string): number {
@@ -188,7 +203,7 @@ function stageCount(stage: string): number {
 }
 
 function isTaskNode(node: ViewerNode): boolean {
-  return ['task', 'todo'].includes(node.type.toLocaleLowerCase())
+  return Boolean(node.workflow)
 }
 
 function isCompleted(node: ViewerNode): boolean {
@@ -245,10 +260,67 @@ function formatDateTime(value?: string): string {
 }
 
 function colorFor(type: string): string {
+  const configured = viewerConfig.value?.entities[type]?.color
+  if (configured)
+    return configured
   let hash = 0
   for (const char of type)
     hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0
   return TYPE_COLORS[Math.abs(hash) % TYPE_COLORS.length]!
+}
+
+function entityLabel(type: string): string {
+  return viewerConfig.value?.entities[type]?.label ?? type
+}
+
+function entityIcon(type: string) {
+  const icon = viewerConfig.value?.entities[type]?.icon
+  return icon ? ENTITY_ICONS[icon] : undefined
+}
+
+function nodeSubtitle(node: ViewerNode): string | undefined {
+  const subtitle = viewerConfig.value?.entities[node.type]?.card?.subtitle
+  if (!subtitle)
+    return undefined
+  const raw = subtitle.field === 'name' ? node.name : node.properties[subtitle.field]
+  if (raw == null || typeof raw === 'object')
+    return undefined
+  const value = String(raw)
+  const text = subtitle.truncate && value.length > subtitle.truncate ? `${value.slice(0, subtitle.truncate)}…` : value
+  return `${subtitle.prefix ?? ''}${text}`
+}
+
+function relationConfig(relation: string) {
+  return matchConfiguredRule(viewerConfig.value?.relations ?? {}, relation)
+}
+
+function relationLabel(relation: string): string {
+  return relationConfig(relation)?.label ?? relation
+}
+
+function relationDirected(edge: ViewerEdge): boolean {
+  return relationConfig(edge.relation)?.directed ?? true
+}
+
+function relationStyle(edge: ViewerEdge): Record<string, string> {
+  const config = relationConfig(edge.relation)
+  const style: Record<string, string> = {}
+  if (config?.color)
+    style['--edge-color'] = config.color
+  if (config?.style === 'dashed')
+    style['--edge-dash'] = '6 4'
+  if (config?.style === 'dotted')
+    style['--edge-dash'] = '2 4'
+  return style
+}
+
+function drawerComponentEnabled(tabId: string, type: ViewerComponentType): boolean {
+  return viewerConfig.value?.drawer.tabs.find(tab => tab.id === tabId)?.components.some(component => component.type === type) ?? false
+}
+
+function relationDirectionEnabled(tabId: string, direction: 'incoming' | 'outgoing'): boolean {
+  const components = viewerConfig.value?.drawer.tabs.find(tab => tab.id === tabId)?.components ?? []
+  return components.some(component => component.type === 'relation-list' && (component.direction === direction || component.direction === 'both' || !component.direction))
 }
 
 function hashPosition(id: string): Point {
@@ -293,10 +365,24 @@ function seedRandom(seed: number): () => number {
 async function loadGraph(): Promise<void> {
   reloadError.value = ''
   try {
-    const response = await fetch('/api/graph', { cache: 'no-store' })
-    const payload = await response.json() as ViewerGraph | { error?: string }
-    if (!response.ok)
-      throw new Error('error' in payload ? payload.error : `HTTP ${response.status}`)
+    const [graphResponse, configResponse] = await Promise.all([
+      fetch('/api/graph', { cache: 'no-store' }),
+      fetch('/api/config', { cache: 'no-store' })
+    ])
+    const payload = await graphResponse.json() as ViewerGraph | { error?: string }
+    if (!graphResponse.ok)
+      throw new Error('error' in payload ? payload.error : `HTTP ${graphResponse.status}`)
+    if (!configResponse.ok)
+      throw new Error(`Config HTTP ${configResponse.status}`)
+    viewerConfig.value = await configResponse.json() as ViewerConfig
+    document.title = `${viewerConfig.value.viewer.title} Inspector`
+    if (!localStorage.getItem('ontograph-node-mode'))
+      cardMode.value = viewerConfig.value.viewer.defaultNodeMode !== 'dot'
+    hiddenRelations.clear()
+    for (const relation of (payload as ViewerGraph).relationTypes) {
+      if (relationConfig(relation)?.defaultVisible === false)
+        hiddenRelations.add(relation)
+    }
     graph.value = payload as ViewerGraph
     rebuildLayout(graph.value)
     await nextTick()
@@ -354,7 +440,8 @@ function toggleTheme(): void {
 function selectNode(id: string, center = false): void {
   overviewOpen.value = false
   selectedId.value = id
-  drawerTab.value = 'overview'
+  const node = nodeById.value.get(id)
+  drawerTab.value = (viewerConfig.value?.drawer.tabs ?? []).find(tab => tab.when === 'always' || Boolean(node?.workflow))?.id ?? 'overview'
   history.replaceState(null, '', `#node=${encodeURIComponent(id)}`)
   if (center) {
     const node = nodeById.value.get(id)
@@ -513,7 +600,7 @@ onBeforeUnmount(() => simulation?.stop())
       <div class="brand">
         <span class="brand-mark" aria-hidden="true"><Network :size="19" :stroke-width="2.2" /></span>
         <div>
-          <strong>Ontograph</strong>
+          <strong>{{ viewerConfig?.viewer.title || 'Ontograph' }}</strong>
           <span>Inspector</span>
         </div>
       </div>
@@ -569,6 +656,8 @@ onBeforeUnmount(() => simulation?.stop())
         :workflow-stages="workflowStages"
         :milestone-count="milestoneCount"
         :color-for="colorFor"
+        :entity-label="entityLabel"
+        :relation-label="relationLabel"
         :status-color="statusColor"
         :status-label="statusLabel"
         :status-count="statusCount"
@@ -614,8 +703,8 @@ onBeforeUnmount(() => simulation?.stop())
               </marker>
             </defs>
             <g class="edge-layer" :transform="`translate(5000 5000) scale(${transform.scale})`">
-              <g v-for="edge in visibleEdges" :key="edge.id" class="edge" :class="{ active: selectedEdgeIds.has(edge.id), faded: selectedId && !selectedEdgeIds.has(edge.id) }">
-                <path :d="edgePath(edge)" :marker-end="selectedEdgeIds.has(edge.id) ? 'url(#arrow-active)' : 'url(#arrow)'" />
+              <g v-for="edge in visibleEdges" :key="edge.id" class="edge" :class="{ active: selectedEdgeIds.has(edge.id), faded: selectedId && !selectedEdgeIds.has(edge.id) }" :style="relationStyle(edge)">
+                <path :d="edgePath(edge)" :marker-end="relationDirected(edge) ? (selectedEdgeIds.has(edge.id) ? 'url(#arrow-active)' : 'url(#arrow)') : undefined" />
                 <text v-if="selectedEdgeIds.has(edge.id)">
                   <textPath :href="`#edge-${edge.id}`" startOffset="50%">{{ edge.label }}</textPath>
                 </text>
@@ -638,15 +727,16 @@ onBeforeUnmount(() => simulation?.stop())
             @pointerup="endNodeDrag($event, node)"
             @pointercancel="endNodeDrag($event, node)"
           >
-            <span class="node-icon">{{ node.type.slice(0, 1).toUpperCase() }}</span>
+            <span class="node-icon"><component :is="entityIcon(node.type)" v-if="entityIcon(node.type)" :size="15" /><template v-else>{{ node.type.slice(0, 1).toUpperCase() }}</template></span>
             <span v-if="cardMode" class="node-copy">
               <span class="node-title-row">
                 <strong>{{ node.name }}</strong>
                 <Flag v-if="node.workflow?.milestone" class="node-milestone" :size="11" aria-label="Milestone" />
                 <span v-if="node.workflow" class="status-badge"><Check v-if="isCompleted(node)" :size="9" />{{ statusLabel(node.workflow.status) }}</span>
               </span>
-              <small v-if="node.workflow?.stage" class="node-stage">Stage · {{ node.workflow.stage }}</small>
-              <small v-else>{{ node.type }} · {{ node.incomingCount + node.outgoingCount }} links</small>
+              <small v-if="nodeSubtitle(node)" class="node-stage">{{ nodeSubtitle(node) }}</small>
+              <small v-else-if="node.workflow?.stage" class="node-stage">Stage · {{ node.workflow.stage }}</small>
+              <small v-else>{{ entityLabel(node.type) }} · {{ node.incomingCount + node.outgoingCount }} links</small>
               <span v-if="node.workflow && goalProgress(node).total" class="node-progress">
                 <span class="progress-track"><span :style="{ width: `${goalProgress(node).percent}%` }" /></span>
                 <small>{{ goalProgress(node).achieved }}/{{ goalProgress(node).total }}</small>
@@ -677,7 +767,7 @@ onBeforeUnmount(() => simulation?.stop())
           <header class="drawer-header">
             <div class="drawer-title">
               <span class="node-icon" :style="{ '--node-color': colorFor(selected.type) }">{{ selected.type.slice(0, 1).toUpperCase() }}</span>
-              <div><strong>{{ selected.name }}</strong><span>{{ selected.type }}</span></div>
+              <div><strong>{{ selected.name }}</strong><span>{{ entityLabel(selected.type) }}</span></div>
             </div>
             <button class="icon-button" type="button" aria-label="Close details" @click="clearSelection">
               <X :size="18" />
@@ -686,19 +776,13 @@ onBeforeUnmount(() => simulation?.stop())
           <code class="entity-id">{{ selected.id }}</code>
 
           <nav class="drawer-tabs" aria-label="Entity detail sections">
-            <button type="button" :class="{ active: drawerTab === 'overview' }" @click="drawerTab = 'overview'">
-              Overview
-            </button>
-            <button v-if="selected.workflow" type="button" :class="{ active: drawerTab === 'journey' }" @click="drawerTab = 'journey'">
-              Journey
-            </button>
-            <button type="button" :class="{ active: drawerTab === 'relations' }" @click="drawerTab = 'relations'">
-              Relations
+            <button v-for="tab in drawerTabs" :key="tab.id" type="button" :class="{ active: drawerTab === tab.id }" @click="drawerTab = tab.id">
+              {{ tab.label }}
             </button>
           </nav>
 
-          <template v-if="drawerTab === 'overview'">
-            <section v-if="selected.workflow" class="drawer-section workflow-section">
+          <div class="drawer-content">
+            <section v-if="selected.workflow && drawerComponentEnabled(drawerTab, 'workflow-summary')" class="drawer-section workflow-section">
               <h2>Task overview</h2>
               <div class="workflow-summary">
                 <div>
@@ -733,7 +817,7 @@ onBeforeUnmount(() => simulation?.stop())
               </div>
             </section>
 
-            <section v-if="selectedGoals.length" class="drawer-section">
+            <section v-if="selectedGoals.length && drawerComponentEnabled(drawerTab, 'goal-list')" class="drawer-section">
               <h2>Goals <span>{{ selectedGoals.length }}</span></h2>
               <div class="goal-list">
                 <div v-for="goal in selectedGoals" :key="goal.id" class="goal-row" :class="`goal-${goal.status}`">
@@ -743,7 +827,7 @@ onBeforeUnmount(() => simulation?.stop())
               </div>
             </section>
 
-            <section v-if="selectedChildren.length" class="drawer-section">
+            <section v-if="selectedChildren.length && drawerComponentEnabled(drawerTab, 'child-progress')" class="drawer-section">
               <h2>Child tasks <span>{{ selectedChildren.length }}</span></h2>
               <div class="child-summary">
                 <span :style="{ width: `${selectedChildProgress.total ? selectedChildProgress.completed / selectedChildProgress.total * 100 : 0}%` }" />
@@ -754,7 +838,7 @@ onBeforeUnmount(() => simulation?.stop())
               </button>
             </section>
 
-            <section v-if="Object.keys(selectedProperties).length" class="drawer-section">
+            <section v-if="Object.keys(selectedProperties).length && drawerComponentEnabled(drawerTab, 'property-list')" class="drawer-section">
               <h2>Properties</h2>
               <dl class="properties">
                 <template v-for="(value, key) in selectedProperties" :key="key">
@@ -762,10 +846,10 @@ onBeforeUnmount(() => simulation?.stop())
                 </template>
               </dl>
             </section>
-          </template>
+          </div>
 
-          <template v-if="drawerTab === 'journey' && selected.workflow">
-            <section class="drawer-section">
+          <template v-if="selected.workflow">
+            <section v-if="drawerComponentEnabled(drawerTab, 'stage-timeline')" class="drawer-section">
               <h2>Stage timeline <span>{{ selectedStages.length }}</span></h2>
               <div v-if="!selectedStages.length" class="empty-list">
                 No named stages yet
@@ -778,7 +862,7 @@ onBeforeUnmount(() => simulation?.stop())
               </div>
             </section>
 
-            <section class="drawer-section">
+            <section v-if="drawerComponentEnabled(drawerTab, 'activity-history')" class="drawer-section">
               <h2>Activity <span>{{ selectedHistory.length }}</span></h2>
               <div v-if="!selectedHistory.length" class="empty-list">
                 No workflow history
@@ -792,29 +876,29 @@ onBeforeUnmount(() => simulation?.stop())
             </section>
           </template>
 
-          <template v-if="drawerTab === 'relations'">
-            <section class="drawer-section">
+          <div class="drawer-content">
+            <section v-if="relationDirectionEnabled(drawerTab, 'incoming')" class="drawer-section">
               <h2>Incoming <span>{{ incoming.length }}</span></h2>
               <div v-if="!incoming.length" class="empty-list">
                 No incoming relationships
               </div>
               <button v-for="edge in incoming" :key="edge.id" type="button" class="relation-row" @click="selectNode(edge.source, true)">
                 <span class="relation-direction"><ArrowLeft :size="15" /></span>
-                <span><strong>{{ relatedNode(edge, 'in')?.name ?? edge.source }}</strong><small>{{ edge.relation }}</small></span>
+                <span><strong>{{ relatedNode(edge, 'in')?.name ?? edge.source }}</strong><small>{{ edge.label }}</small></span>
               </button>
             </section>
 
-            <section class="drawer-section">
+            <section v-if="relationDirectionEnabled(drawerTab, 'outgoing')" class="drawer-section">
               <h2>Outgoing <span>{{ outgoing.length }}</span></h2>
               <div v-if="!outgoing.length" class="empty-list">
                 No outgoing relationships
               </div>
               <button v-for="edge in outgoing" :key="edge.id" type="button" class="relation-row" @click="selectNode(edge.target, true)">
                 <span class="relation-direction"><ArrowRight :size="15" /></span>
-                <span><strong>{{ relatedNode(edge, 'out')?.name ?? edge.target }}</strong><small>{{ edge.relation }}</small></span>
+                <span><strong>{{ relatedNode(edge, 'out')?.name ?? edge.target }}</strong><small>{{ edge.label }}</small></span>
               </button>
             </section>
-          </template>
+          </div>
         </aside>
       </Transition>
     </section>

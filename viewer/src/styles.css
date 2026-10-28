@@ -108,7 +108,7 @@ button { color: inherit; }
 .graph-canvas.panning { cursor: grabbing; }
 .world { position: absolute; top: 0; left: 0; width: 1px; height: 1px; transform-origin: 0 0; will-change: transform; }
 .edges { position: absolute; inset: -5000px; width: 10000px; height: 10000px; overflow: visible; pointer-events: none; }
-.edge path:not(.label-path) { fill: none; stroke: var(--edge); stroke-width: 1.25; vector-effect: non-scaling-stroke; transition: opacity .15s, stroke .15s; }
+.edge path:not(.label-path) { fill: none; stroke: var(--edge-color, var(--edge)); stroke-width: 1.25; stroke-dasharray: var(--edge-dash, none); vector-effect: non-scaling-stroke; transition: opacity .15s, stroke .15s; }
 .edge .label-path { fill: none; stroke: transparent; }
 .edge marker path { fill: var(--edge); }
 .edge.active path:not(.label-path) { stroke: var(--primary-vivid); stroke-width: 2.2; }
@@ -165,6 +165,7 @@ button { color: inherit; }
 .drawer-tabs { position: sticky; z-index: 2; top: -18px; display: flex; gap: 4px; margin: 12px -4px 0; padding: 8px 4px; background: color-mix(in srgb, var(--surface-solid) 86%, transparent); backdrop-filter: blur(12px); }
 .drawer-tabs button { flex: 1; height: 30px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; cursor: pointer; font-size: 10px; }
 .drawer-tabs button:hover, .drawer-tabs button.active { color: var(--primary); background: var(--primary-soft); }
+.drawer-content { display: contents; }
 .drawer-section { margin-top: 22px; }
 .drawer-section h2 { display: flex; align-items: center; gap: 6px; margin: 0 0 9px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
 .drawer-section h2 span { display: inline-grid; place-items: center; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 10px; color: var(--primary); background: var(--primary-soft); font-size: 9px; }

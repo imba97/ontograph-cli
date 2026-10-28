@@ -42,10 +42,12 @@ ontograph inspect
 启动本地只读关系图谱 Viewer，并自动在浏览器中打开。画布使用力导向布局，不要求根节点，关联实体会自然形成多个关系簇。
 
 ```bash
-ontograph inspect [--data-dir <目录>] [--port <端口>] [--host <地址>] [--no-open] [--focus <实体ID>]
+ontograph inspect [--data-dir <目录>] [--config <文件>] [--port <端口>] [--host <地址>] [--no-open] [--focus <实体ID>]
 ```
 
 支持搜索和类型筛选、卡片/圆点模式、平移缩放、手动重新加载，以及选中实体的关系抽屉。第一版不监听文件变化、不编辑图数据，也不生成 HTML 文件。
+
+数据目录存在 `viewer.yaml` 时会自动加载，也可通过 `--config <文件>` 指定其他配置。这个单一版本化配置负责映射项目的工作流字段、状态语义、实体样式、关系默认显隐和抽屉组件。没有配置时保持为通用实体关系图，不预设任务语义。
 
 ### `add <type>`
 
