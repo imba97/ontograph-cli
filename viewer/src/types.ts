@@ -26,7 +26,7 @@ export interface ViewerWorkflow {
   completed: boolean
   stage?: string | null
   completedAt?: string | null
-  milestone?: boolean
+  milestoneCount: number
   goals: ViewerGoal[]
   history: ViewerHistory[]
   hierarchy?: { relation: string, direction: 'child-to-parent' | 'parent-to-child' }
@@ -40,6 +40,7 @@ export interface ViewerHistory {
   from?: string | null
   to?: string
   stage?: string | null
+  milestone?: boolean
 }
 
 export interface LayoutNode extends ViewerNode, SimulationNodeDatum {

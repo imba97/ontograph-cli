@@ -46,7 +46,7 @@ const viewerConfigSchema = z.object({
       stage: fieldName.optional(),
       goals: fieldName.optional(),
       history: fieldName.optional(),
-      milestone: fieldName.optional(),
+      milestones: fieldName.optional(),
       completedAt: fieldName.optional()
     }),
     hierarchy: z.object({

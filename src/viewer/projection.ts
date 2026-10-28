@@ -28,7 +28,7 @@ export interface ViewerWorkflow {
   completed: boolean
   stage?: string | null
   completedAt?: string | null
-  milestone?: boolean
+  milestoneCount: number
   goals: ViewerGoal[]
   history: ViewerHistory[]
   hierarchy?: ViewerWorkflowConfig['hierarchy']
@@ -42,6 +42,7 @@ export interface ViewerHistory {
   from?: string | null
   to?: string
   stage?: string | null
+  milestone?: boolean
 }
 
 export interface ViewerEdge {
@@ -77,7 +78,8 @@ function projectWorkflow(entity: Entity, config: ViewerConfig): ViewerWorkflow |
   const stage = workflow.fields.stage ? entity[workflow.fields.stage] : undefined
   const goalsValue = workflow.fields.goals ? entity[workflow.fields.goals] : undefined
   const historyValue = workflow.fields.history ? entity[workflow.fields.history] : undefined
-  const milestone = workflow.fields.milestone ? entity[workflow.fields.milestone] : undefined
+  const milestoneValue = workflow.fields.milestones ? entity[workflow.fields.milestones] : undefined
+  const milestoneStepIds = new Set(Array.isArray(milestoneValue) ? milestoneValue.filter(value => typeof value === 'string') : [])
   const completedAt = workflow.fields.completedAt ? entity[workflow.fields.completedAt] : undefined
 
   const goals = Array.isArray(goalsValue)
@@ -111,7 +113,8 @@ function projectWorkflow(entity: Entity, config: ViewerConfig): ViewerWorkflow |
           text: value.text,
           from: typeof value.from === 'string' || value.from === null ? value.from : undefined,
           to: typeof value.to === 'string' ? value.to : undefined,
-          stage: typeof value.stage === 'string' || value.stage === null ? value.stage : undefined
+          stage: typeof value.stage === 'string' || value.stage === null ? value.stage : undefined,
+          milestone: typeof value.id === 'string' && milestoneStepIds.has(value.id)
         }]
       })
     : []
@@ -124,7 +127,7 @@ function projectWorkflow(entity: Entity, config: ViewerConfig): ViewerWorkflow |
     completed: typeof status === 'string' ? workflow.statuses[status]?.completed ?? false : false,
     stage: typeof stage === 'string' || stage === null ? stage : undefined,
     completedAt: typeof completedAt === 'string' || completedAt === null ? completedAt : undefined,
-    milestone: typeof milestone === 'boolean' ? milestone : undefined,
+    milestoneCount: milestoneStepIds.size,
     goals,
     history,
     hierarchy: workflow.hierarchy

@@ -17,7 +17,7 @@ const workflowConfig: ViewerConfig = {
   workflows: {
     task: {
       entityTypes: ['todo'],
-      fields: { status: 'status', stage: 'stage', goals: 'goals', history: 'history', milestone: 'milestone', completedAt: 'completedAt' },
+      fields: { status: 'status', stage: 'stage', goals: 'goals', history: 'history', milestones: 'milestoneStepIds', completedAt: 'completedAt' },
       hierarchy: { relation: 'child_of', direction: 'child-to-parent' },
       statuses: { 'in-progress': { label: 'In progress', color: '#6750d8', completed: false } }
     }
@@ -64,7 +64,7 @@ describe('ontology viewer', () => {
         status: 'in-progress',
         stage: 'verification',
         completedAt: null,
-        milestone: true,
+        milestoneStepIds: ['history-1'],
         goals: [
           { id: 'goal-1', text: 'Build UI', status: 'achieved', scope: 'stage', stage: 'implementation' },
           { id: 'goal-2', text: 'Verify UI', status: 'pending', scope: 'stage', stage: 'verification' }
@@ -83,13 +83,13 @@ describe('ontology viewer', () => {
       completed: false,
       stage: 'verification',
       completedAt: null,
-      milestone: true,
+      milestoneCount: 1,
       goals: [
         { id: 'goal-1', text: 'Build UI', status: 'achieved', scope: 'stage', stage: 'implementation' },
         { id: 'goal-2', text: 'Verify UI', status: 'pending', scope: 'stage', stage: 'verification' }
       ],
       history: [
-        { id: 'history-1', at: '2026-01-01T00:00:00.000Z', kind: 'stage', text: 'Enter verification', from: 'implementation', to: 'verification', stage: undefined }
+        { id: 'history-1', at: '2026-01-01T00:00:00.000Z', kind: 'stage', text: 'Enter verification', from: 'implementation', to: 'verification', stage: undefined, milestone: true }
       ],
       hierarchy: { relation: 'child_of', direction: 'child-to-parent' }
     })

@@ -14,6 +14,7 @@ function task(id: string, status: string, goals: NonNullable<ViewerNode['workflo
       key: 'task',
       status,
       completed: status === 'done',
+      milestoneCount: 0,
       goals,
       history: [],
       hierarchy: { relation: 'child_of', direction: 'child-to-parent' }

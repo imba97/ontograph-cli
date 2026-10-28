@@ -33,7 +33,7 @@ import { wheelZoomFactor } from './zoom'
 interface Point { x: number, y: number }
 interface Transform { x: number, y: number, scale: number }
 interface LayoutLink extends SimulationLinkDatum<LayoutNode> { id: string }
-interface StageSummary { name: string, at?: string, current: boolean, achieved: number, total: number }
+interface StageSummary { name: string, at?: string, current: boolean, milestone: boolean, achieved: number, total: number }
 
 const TYPE_COLORS = ['#7c6cf2', '#0ea5a4', '#e07a45', '#db5c95', '#3f83d1', '#8a9a44', '#b668db', '#60798c']
 const ENTITY_ICONS = { 'circle-check': CircleCheck, 'book-open': BookOpen, 'user': User, 'folder-tree': FolderTree, 'tag': Tag }
@@ -70,7 +70,7 @@ const taskNodes = computed(() => workflowNodes.value.filter(isTaskNode))
 const workflowStatuses = computed(() => [...new Set(taskNodes.value.flatMap(node => node.workflow?.status ? [node.workflow.status] : []))].sort())
 const workflowStages = computed(() => [...new Set(taskNodes.value.map(node => node.workflow?.stage || 'Unstaged'))].sort())
 const completedTaskCount = computed(() => taskNodes.value.filter(node => isCompleted(node)).length)
-const milestoneCount = computed(() => taskNodes.value.filter(node => node.workflow?.milestone).length)
+const milestoneCount = computed(() => taskNodes.value.reduce((total, node) => total + (node.workflow?.milestoneCount ?? 0), 0))
 const hierarchyRelations = computed(() => new Set(Object.values(viewerConfig.value?.workflows ?? {}).flatMap(workflow => workflow.hierarchy ? [workflow.hierarchy.relation] : [])))
 const taskGoalProgress = computed(() => {
   const goals = taskNodes.value.flatMap(node => node.workflow?.goals ?? [])
@@ -81,7 +81,7 @@ const taskGoalProgress = computed(() => {
 const milestoneContextIds = computed(() => {
   if (!onlyMilestones.value)
     return null
-  const milestoneIds = new Set(taskNodes.value.filter(node => node.workflow?.milestone).map(node => node.id))
+  const milestoneIds = new Set(taskNodes.value.filter(node => node.workflow?.milestoneCount).map(node => node.id))
   const ids = new Set(milestoneIds)
   for (const edge of graph.value?.edges ?? []) {
     if (!hierarchyRelations.value.has(edge.relation))
@@ -122,7 +122,7 @@ const outgoing = computed(() => graphIndex.value.outgoingByNodeId.get(selectedId
 const selectedProperties = computed(() => {
   if (!selected.value?.workflow)
     return selected.value?.properties ?? {}
-  const workflowKeys = new Set(['status', 'stage', 'goals', 'history', 'completedAt', 'milestone'])
+  const workflowKeys = new Set(['status', 'stage', 'goals', 'history', 'completedAt', 'milestoneStepIds'])
   const entries = Object.entries(selected.value.properties).filter(([key]) => !workflowKeys.has(key))
   const fields = viewerConfig.value?.drawer.tabs.find(tab => tab.id === drawerTab.value)?.components.find(component => component.type === 'property-list')?.fields
   return Object.fromEntries(fields?.length ? entries.filter(([key]) => fields.includes(key)) : entries)
@@ -165,6 +165,7 @@ const selectedStages = computed<StageSummary[]>(() => {
       name,
       at: enteredAt.get(name),
       current: name === workflow.stage,
+      milestone: workflow.history.some(entry => entry.kind === 'stage' && (entry.to || entry.stage) === name && entry.milestone),
       achieved: goals.filter(goal => goal.status === 'achieved').length,
       total: goals.length
     }
@@ -506,7 +507,7 @@ function nodeClass(node: LayoutNode): Record<string, boolean> {
     'dot': !cardMode.value,
     'has-workflow': Boolean(node.workflow),
     'completed': isCompleted(node),
-    'milestone': Boolean(node.workflow?.milestone)
+    'milestone': Boolean(node.workflow?.milestoneCount)
   }
 }
 
@@ -740,7 +741,7 @@ onBeforeUnmount(() => simulation?.stop())
             <span v-if="cardMode" class="node-copy">
               <span class="node-title-row">
                 <strong>{{ node.name }}</strong>
-                <Flag v-if="node.workflow?.milestone" class="node-milestone" :size="11" aria-label="Milestone" />
+                <span v-if="node.workflow?.milestoneCount" class="node-milestone" :aria-label="`${node.workflow.milestoneCount} milestones`"><Flag :size="11" />{{ node.workflow.milestoneCount }}</span>
                 <span v-if="node.workflow" class="status-badge"><Check v-if="isCompleted(node)" :size="9" />{{ statusLabel(node.workflow.status) }}</span>
               </span>
               <small v-if="nodeSubtitle(node)" class="node-stage">{{ nodeSubtitle(node) }}</small>
@@ -812,9 +813,9 @@ onBeforeUnmount(() => simulation?.stop())
                   <span>Child tasks closed</span>
                   <strong>{{ selectedChildProgress.completed }} / {{ selectedChildProgress.total }}</strong>
                 </div>
-                <div v-if="selected.workflow.milestone">
-                  <span>Marker</span>
-                  <strong class="milestone-label"><Flag :size="12" /> Milestone</strong>
+                <div v-if="selected.workflow.milestoneCount">
+                  <span>Milestones</span>
+                  <strong class="milestone-label"><Flag :size="12" /> {{ selected.workflow.milestoneCount }}</strong>
                 </div>
                 <div v-if="selected.workflow.completedAt">
                   <span>Completed at</span>
@@ -864,8 +865,8 @@ onBeforeUnmount(() => simulation?.stop())
                 No named stages yet
               </div>
               <div v-else class="stage-timeline">
-                <div v-for="stage in selectedStages" :key="stage.name" class="stage-step" :class="{ current: stage.current }">
-                  <span class="stage-node"><Check v-if="!stage.current && stage.total && stage.achieved === stage.total" :size="11" /><Clock3 v-else :size="11" /></span>
+                <div v-for="stage in selectedStages" :key="stage.name" class="stage-step" :class="{ current: stage.current, milestone: stage.milestone }">
+                  <span class="stage-node"><Flag v-if="stage.milestone" :size="11" /><Check v-else-if="!stage.current && stage.total && stage.achieved === stage.total" :size="11" /><Clock3 v-else :size="11" /></span>
                   <div><strong>{{ stage.name }}</strong><small>{{ stage.current ? 'Current stage' : formatDateTime(stage.at) }}<template v-if="stage.total"> · {{ stage.achieved }}/{{ stage.total }} goals</template></small></div>
                 </div>
               </div>
@@ -877,9 +878,9 @@ onBeforeUnmount(() => simulation?.stop())
                 No workflow history
               </div>
               <div v-else class="history-list">
-                <div v-for="entry in selectedHistory" :key="entry.id" class="history-row">
-                  <span class="history-kind">{{ entry.kind }}</span>
-                  <div><strong>{{ entry.text }}</strong><small>{{ formatDateTime(entry.at) }}</small></div>
+                <div v-for="entry in selectedHistory" :key="entry.id" class="history-row" :class="{ milestone: entry.milestone }">
+                  <span class="history-kind"><Flag v-if="entry.milestone" :size="10" />{{ entry.milestone ? 'milestone' : entry.kind }}</span>
+                  <div><strong>{{ entry.text }}</strong><small>{{ formatDateTime(entry.at) }}<template v-if="entry.milestone"> · Milestone</template></small></div>
                 </div>
               </div>
             </section>

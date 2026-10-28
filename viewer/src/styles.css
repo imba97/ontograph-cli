@@ -128,7 +128,7 @@ button { color: inherit; }
 .node-copy small { color: var(--muted); font-size: 9px; white-space: nowrap; }
 .node-title-row { min-width: 0; display: flex; align-items: center; gap: 5px; }
 .node-title-row > strong { min-width: 0; flex: 1; }
-.node-milestone { flex: none; color: var(--primary); fill: var(--primary-soft); }
+.node-milestone { flex: none; display: inline-flex; align-items: center; gap: 1px; color: var(--primary); fill: var(--primary-soft); font-size: 8px; font-weight: 700; }
 .status-badge { flex: none; display: inline-flex; align-items: center; gap: 2px; max-width: 68px; padding: 2px 5px; overflow: hidden; border-radius: 8px; color: var(--status-color); background: color-mix(in srgb, var(--status-color) 12%, transparent); font-size: 8px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .node-stage { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .node-progress { display: flex; align-items: center; gap: 5px; }
@@ -203,12 +203,15 @@ button { color: inherit; }
 .stage-step:not(:last-child)::before { content: ""; position: absolute; left: 12px; top: 24px; bottom: 0; width: 1px; background: var(--border); }
 .stage-node { z-index: 1; display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid var(--border); border-radius: 50%; color: var(--muted); background: var(--surface-solid); }
 .stage-step.current .stage-node { border-color: var(--primary); color: white; background: var(--primary); box-shadow: 0 0 0 4px var(--primary-soft); }
+.stage-step.milestone .stage-node { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); box-shadow: 0 0 0 4px var(--primary-soft); }
 .stage-step > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; padding-top: 4px; }
 .stage-step strong { font-size: 11px; }
 .stage-step small { color: var(--muted); font-size: 9px; }
 .history-list { display: flex; flex-direction: column; gap: 5px; }
 .history-row { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 8px; padding: 8px; border-bottom: 1px solid var(--border); }
+.history-row.milestone { border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border)); border-radius: 10px; background: var(--primary-soft); }
 .history-kind { align-self: start; padding: 3px 5px; overflow: hidden; border-radius: 6px; color: var(--primary); background: var(--primary-soft); font-size: 8px; text-align: center; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.history-kind:has(svg) { display: flex; align-items: center; justify-content: center; gap: 3px; }
 .history-row > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .history-row strong { font-size: 10px; font-weight: 600; line-height: 1.4; }
 .history-row small { color: var(--muted); font-size: 9px; }
