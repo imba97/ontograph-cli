@@ -40,6 +40,34 @@ describe('ontology viewer', () => {
     })
   })
 
+  it('projects workflow metadata without interpreting task progress', () => {
+    const graph = seedGraph(createStore(), [
+      ['todo_aaaaaaaaaaaa', {
+        type: 'todo',
+        name: 'Ship inspector',
+        status: 'in-progress',
+        stage: 'verification',
+        completedAt: null,
+        milestone: true,
+        goals: [
+          { id: 'goal-1', text: 'Build UI', status: 'achieved', scope: 'stage', stage: 'implementation' },
+          { id: 'goal-2', text: 'Verify UI', status: 'pending', scope: 'stage', stage: 'verification' }
+        ]
+      }]
+    ]).getGraph()
+
+    expect(projectViewerGraph(graph).nodes[0]?.workflow).toEqual({
+      status: 'in-progress',
+      stage: 'verification',
+      completedAt: null,
+      milestone: true,
+      goals: [
+        { id: 'goal-1', text: 'Build UI', status: 'achieved', scope: 'stage', stage: 'implementation' },
+        { id: 'goal-2', text: 'Verify UI', status: 'pending', scope: 'stage', stage: 'verification' }
+      ]
+    })
+  })
+
   it('serves the graph without allowing writes', async () => {
     const store = seedGraph(createStore(), [
       ['person_aaaaaaaaaaaa', { type: 'person', name: 'Ada' }]

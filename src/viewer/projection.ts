@@ -7,6 +7,23 @@ export interface ViewerNode {
   properties: Record<string, unknown>
   incomingCount: number
   outgoingCount: number
+  workflow?: ViewerWorkflow
+}
+
+export interface ViewerGoal {
+  id: string
+  text: string
+  status: string
+  scope?: string
+  stage?: string | null
+}
+
+export interface ViewerWorkflow {
+  status?: string
+  stage?: string | null
+  completedAt?: string | null
+  milestone?: boolean
+  goals: ViewerGoal[]
 }
 
 export interface ViewerEdge {
@@ -33,6 +50,43 @@ function safeProperties(entity: Entity): Record<string, unknown> {
   )
 }
 
+function projectWorkflow(entity: Entity): ViewerWorkflow | undefined {
+  const hasWorkflow = typeof entity.status === 'string'
+    || typeof entity.stage === 'string'
+    || entity.stage === null
+    || Array.isArray(entity.goals)
+    || typeof entity.completedAt === 'string'
+    || typeof entity.milestone === 'boolean'
+
+  if (!hasWorkflow)
+    return undefined
+
+  const goals = Array.isArray(entity.goals)
+    ? entity.goals.flatMap((goal, index) => {
+        if (!goal || typeof goal !== 'object')
+          return []
+        const value = goal as Record<string, unknown>
+        if (typeof value.text !== 'string' || typeof value.status !== 'string')
+          return []
+        return [{
+          id: typeof value.id === 'string' ? value.id : `goal-${index}`,
+          text: value.text,
+          status: value.status,
+          scope: typeof value.scope === 'string' ? value.scope : undefined,
+          stage: typeof value.stage === 'string' || value.stage === null ? value.stage : undefined
+        }]
+      })
+    : []
+
+  return {
+    status: typeof entity.status === 'string' ? entity.status : undefined,
+    stage: typeof entity.stage === 'string' || entity.stage === null ? entity.stage : undefined,
+    completedAt: typeof entity.completedAt === 'string' || entity.completedAt === null ? entity.completedAt : undefined,
+    milestone: typeof entity.milestone === 'boolean' ? entity.milestone : undefined,
+    goals
+  }
+}
+
 export function projectViewerGraph(graph: Graph, generatedAt = new Date().toISOString()): ViewerGraph {
   const incoming = new Map<string, number>()
   const outgoing = new Map<string, number>()
@@ -50,7 +104,8 @@ export function projectViewerGraph(graph: Graph, generatedAt = new Date().toISOS
       name: String(entity.name),
       properties: safeProperties(entity),
       incomingCount: incoming.get(id) ?? 0,
-      outgoingCount: outgoing.get(id) ?? 0
+      outgoingCount: outgoing.get(id) ?? 0,
+      workflow: projectWorkflow(entity)
     }))
 
   const duplicateCounts = new Map<string, number>()

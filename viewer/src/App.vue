@@ -4,7 +4,9 @@ import type { LayoutNode, ViewerEdge, ViewerGraph, ViewerNode } from './types'
 import {
   ArrowLeft,
   ArrowRight,
+  Check,
   CircleDot,
+  Flag,
   Focus,
   Moon,
   Network,
@@ -36,6 +38,8 @@ const cardMode = ref(localStorage.getItem('ontograph-node-mode') !== 'dot')
 const dark = ref(localStorage.getItem('ontograph-theme') === 'dark' || (!localStorage.getItem('ontograph-theme') && matchMedia('(prefers-color-scheme: dark)').matches))
 const hiddenTypes = reactive(new Set<string>())
 const hiddenRelations = reactive(new Set<string>())
+const hiddenStatuses = reactive(new Set<string>())
+const hiddenStages = reactive(new Set<string>())
 const transform = reactive<Transform>({ x: 0, y: 0, scale: 1 })
 const canvas = ref<HTMLElement | null>(null)
 const positionsVersion = ref(0)
@@ -45,9 +49,21 @@ let dragNode: LayoutNode | null = null
 
 const nodeById = computed(() => new Map(nodes.value.map(node => [node.id, node])))
 const selected = computed(() => selectedId.value ? nodeById.value.get(selectedId.value) ?? null : null)
+const workflowNodes = computed(() => nodes.value.filter(node => node.workflow))
+const taskNodes = computed(() => workflowNodes.value.filter(isTaskNode))
+const workflowStatuses = computed(() => [...new Set(taskNodes.value.flatMap(node => node.workflow?.status ? [node.workflow.status] : []))].sort())
+const workflowStages = computed(() => [...new Set(taskNodes.value.map(node => node.workflow?.stage || 'Unstaged'))].sort())
+const completedTaskCount = computed(() => taskNodes.value.filter(node => isCompleted(node)).length)
 const visibleNodes = computed(() => {
   const needle = query.value.trim().toLocaleLowerCase()
-  return nodes.value.filter(node => !hiddenTypes.has(node.type) && (!needle || node.name.toLocaleLowerCase().includes(needle) || node.id.toLocaleLowerCase().includes(needle)))
+  return nodes.value.filter((node) => {
+    const stage = node.workflow?.stage || 'Unstaged'
+    const workflowVisible = !isTaskNode(node)
+      || ((!node.workflow?.status || !hiddenStatuses.has(node.workflow.status)) && !hiddenStages.has(stage))
+    return !hiddenTypes.has(node.type)
+      && workflowVisible
+      && (!needle || node.name.toLocaleLowerCase().includes(needle) || node.id.toLocaleLowerCase().includes(needle))
+  })
 })
 const visibleIds = computed(() => new Set(visibleNodes.value.map(node => node.id)))
 const visibleEdges = computed(() => graph.value?.edges.filter(edge => !hiddenRelations.has(edge.relation) && visibleIds.value.has(edge.source) && visibleIds.value.has(edge.target)) ?? [])
@@ -61,6 +77,75 @@ const neighborIds = computed(() => {
 })
 const incoming = computed(() => graph.value?.edges.filter(edge => edge.target === selectedId.value) ?? [])
 const outgoing = computed(() => graph.value?.edges.filter(edge => edge.source === selectedId.value) ?? [])
+const selectedProperties = computed(() => {
+  if (!selected.value?.workflow)
+    return selected.value?.properties ?? {}
+  const workflowKeys = new Set(['status', 'stage', 'goals', 'completedAt', 'milestone'])
+  return Object.fromEntries(Object.entries(selected.value.properties).filter(([key]) => !workflowKeys.has(key)))
+})
+const selectedGoals = computed(() => {
+  const workflow = selected.value?.workflow
+  if (!workflow)
+    return []
+  return [...workflow.goals].sort((left, right) => {
+    const leftCurrent = left.stage === workflow.stage ? 0 : left.stage == null ? 1 : 2
+    const rightCurrent = right.stage === workflow.stage ? 0 : right.stage == null ? 1 : 2
+    return leftCurrent - rightCurrent
+  })
+})
+
+const STATUS_LABELS: Record<string, string> = {
+  'todo': 'Todo',
+  'in-progress': 'In progress',
+  'done': 'Closed',
+  'reopened': 'Reopened'
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  'todo': '#8b8f9c',
+  'in-progress': '#6750d8',
+  'done': '#22a06b',
+  'reopened': '#d9822b'
+}
+
+function statusLabel(status?: string): string {
+  return status ? STATUS_LABELS[status] ?? status : 'Unknown'
+}
+
+function statusColor(status?: string): string {
+  return status ? STATUS_COLORS[status] ?? '#60798c' : '#8b8f9c'
+}
+
+function statusCount(status: string): number {
+  return taskNodes.value.filter(node => node.workflow?.status === status).length
+}
+
+function stageCount(stage: string): number {
+  return taskNodes.value.filter(node => (node.workflow?.stage || 'Unstaged') === stage).length
+}
+
+function isTaskNode(node: ViewerNode): boolean {
+  return ['task', 'todo'].includes(node.type.toLocaleLowerCase())
+}
+
+function isCompleted(node: ViewerNode): boolean {
+  return ['done', 'completed', 'closed'].includes(node.workflow?.status?.toLocaleLowerCase() ?? '')
+}
+
+function goalProgress(node: ViewerNode): { achieved: number, total: number, percent: number, cancelled: number } {
+  const goals = node.workflow?.goals ?? []
+  const achieved = goals.filter(goal => goal.status === 'achieved').length
+  const cancelled = goals.filter(goal => goal.status === 'cancelled').length
+  const total = goals.length - cancelled
+  return { achieved, total, percent: total ? achieved / total * 100 : 0, cancelled }
+}
+
+function resetFilters(): void {
+  hiddenTypes.clear()
+  hiddenRelations.clear()
+  hiddenStatuses.clear()
+  hiddenStages.clear()
+}
 
 function colorFor(type: string): string {
   let hash = 0
@@ -91,12 +176,12 @@ function rebuildLayout(nextGraph: ViewerGraph): void {
   const links: LayoutLink[] = nextGraph.edges.map(edge => ({ id: edge.id, source: edge.source, target: edge.target }))
   simulation = forceSimulation<LayoutNode>(nodes.value)
     .randomSource(seedRandom(42))
-    .force('link', forceLink<LayoutNode, LayoutLink>(links).id(node => node.id).distance(cardMode.value ? 190 : 90).strength(0.22))
+    .force('link', forceLink<LayoutNode, LayoutLink>(links).id(node => node.id).distance(cardMode.value ? 210 : 90).strength(0.22))
     .force('charge', forceManyBody().strength(cardMode.value ? -540 : -170))
     .force('center', forceCenter(0, 0).strength(0.08))
     .force('x', forceX(0).strength(0.025))
     .force('y', forceY(0).strength(0.025))
-    .force('collision', forceCollide<LayoutNode>().radius(cardMode.value ? 78 : 24).iterations(2))
+    .force('collision', forceCollide<LayoutNode>().radius(cardMode.value ? 98 : 24).iterations(2))
     .alphaDecay(0.035)
     .on('tick', () => positionsVersion.value++)
 }
@@ -228,10 +313,12 @@ function nodeTransform(node: LayoutNode): string {
 
 function nodeClass(node: LayoutNode): Record<string, boolean> {
   return {
-    selected: node.id === selectedId.value,
-    neighbor: neighborIds.value.has(node.id),
-    faded: Boolean(selectedId.value && node.id !== selectedId.value && !neighborIds.value.has(node.id)),
-    dot: !cardMode.value
+    'selected': node.id === selectedId.value,
+    'neighbor': neighborIds.value.has(node.id),
+    'faded': Boolean(selectedId.value && node.id !== selectedId.value && !neighborIds.value.has(node.id)),
+    'dot': !cardMode.value,
+    'has-workflow': Boolean(node.workflow),
+    'completed': isCompleted(node)
   }
 }
 
@@ -336,7 +423,10 @@ onBeforeUnmount(() => simulation?.stop())
         <kbd v-if="query">{{ visibleNodes.length }}</kbd>
       </label>
       <div class="header-actions">
-        <span class="stats">{{ visibleNodes.length }} nodes · {{ visibleEdges.length }} relations</span>
+        <span class="stats">
+          {{ visibleNodes.length }} nodes · {{ visibleEdges.length }} relations
+          <template v-if="taskNodes.length"> · {{ completedTaskCount }}/{{ taskNodes.length }} tasks closed</template>
+        </span>
         <button class="icon-button" type="button" :aria-label="dark ? 'Use light theme' : 'Use dark theme'" @click="toggleTheme">
           <Sun v-if="dark" :size="17" />
           <Moon v-else :size="17" />
@@ -348,7 +438,7 @@ onBeforeUnmount(() => simulation?.stop())
       <aside class="filters glass">
         <div class="panel-heading">
           <strong>Filters</strong>
-          <button v-if="hiddenTypes.size || hiddenRelations.size" type="button" class="text-button" @click="hiddenTypes.clear(); hiddenRelations.clear()">
+          <button v-if="hiddenTypes.size || hiddenRelations.size || hiddenStatuses.size || hiddenStages.size" type="button" class="text-button" @click="resetFilters">
             Reset
           </button>
         </div>
@@ -359,6 +449,24 @@ onBeforeUnmount(() => simulation?.stop())
             <span class="type-dot" :style="{ background: colorFor(type) }" />
             <span>{{ type }}</span>
             <small>{{ nodes.filter(node => node.type === type).length }}</small>
+          </label>
+        </div>
+        <div v-if="workflowStatuses.length" class="filter-section">
+          <span class="filter-label">Task status</span>
+          <label v-for="status in workflowStatuses" :key="status" class="filter-row">
+            <input type="checkbox" :checked="!hiddenStatuses.has(status)" @change="toggleSet(hiddenStatuses, status)">
+            <span class="type-dot status-dot" :style="{ background: statusColor(status) }" />
+            <span>{{ statusLabel(status) }}</span>
+            <small>{{ statusCount(status) }}</small>
+          </label>
+        </div>
+        <div v-if="workflowStages.length" class="filter-section">
+          <span class="filter-label">Current stage</span>
+          <label v-for="stage in workflowStages" :key="stage" class="filter-row">
+            <input type="checkbox" :checked="!hiddenStages.has(stage)" @change="toggleSet(hiddenStages, stage)">
+            <span class="stage-mark" />
+            <span :title="stage">{{ stage }}</span>
+            <small>{{ stageCount(stage) }}</small>
           </label>
         </div>
         <div class="filter-section relation-filters">
@@ -422,7 +530,7 @@ onBeforeUnmount(() => simulation?.stop())
             type="button"
             class="graph-node"
             :class="nodeClass(node)"
-            :style="{ 'transform': nodeTransform(node), '--node-color': colorFor(node.type) }"
+            :style="{ 'transform': nodeTransform(node), '--node-color': colorFor(node.type), '--status-color': statusColor(node.workflow?.status) }"
             :aria-label="`${node.name}, ${node.type}`"
             @click.stop="selectNode(node.id)"
             @pointerdown="startNodeDrag($event, node)"
@@ -432,8 +540,16 @@ onBeforeUnmount(() => simulation?.stop())
           >
             <span class="node-icon">{{ node.type.slice(0, 1).toUpperCase() }}</span>
             <span v-if="cardMode" class="node-copy">
-              <strong>{{ node.name }}</strong>
-              <small>{{ node.type }} · {{ node.incomingCount + node.outgoingCount }} links</small>
+              <span class="node-title-row">
+                <strong>{{ node.name }}</strong>
+                <span v-if="node.workflow" class="status-badge"><Check v-if="isCompleted(node)" :size="9" />{{ statusLabel(node.workflow.status) }}</span>
+              </span>
+              <small v-if="node.workflow?.stage" class="node-stage">Stage · {{ node.workflow.stage }}</small>
+              <small v-else>{{ node.type }} · {{ node.incomingCount + node.outgoingCount }} links</small>
+              <span v-if="node.workflow && goalProgress(node).total" class="node-progress">
+                <span class="progress-track"><span :style="{ width: `${goalProgress(node).percent}%` }" /></span>
+                <small>{{ goalProgress(node).achieved }}/{{ goalProgress(node).total }}</small>
+              </span>
             </span>
             <span v-if="!cardMode" class="dot-label">{{ node.name }}</span>
           </button>
@@ -476,10 +592,51 @@ onBeforeUnmount(() => simulation?.stop())
           </header>
           <code class="entity-id">{{ selected.id }}</code>
 
-          <section v-if="Object.keys(selected.properties).length" class="drawer-section">
+          <section v-if="selected.workflow" class="drawer-section workflow-section">
+            <h2>Task overview</h2>
+            <div class="workflow-summary">
+              <div>
+                <span>Status</span>
+                <strong class="summary-status" :style="{ '--status-color': statusColor(selected.workflow.status) }">
+                  <span />{{ statusLabel(selected.workflow.status) }}
+                </strong>
+              </div>
+              <div>
+                <span>Current stage</span>
+                <strong>{{ selected.workflow.stage || 'Unstaged' }}</strong>
+              </div>
+              <div>
+                <span>Goal progress</span>
+                <strong>{{ goalProgress(selected).achieved }} / {{ goalProgress(selected).total }}</strong>
+              </div>
+              <div v-if="selected.workflow.milestone">
+                <span>Marker</span>
+                <strong class="milestone-label"><Flag :size="12" /> Milestone</strong>
+              </div>
+              <div v-if="selected.workflow.completedAt">
+                <span>Completed at</span>
+                <strong>{{ selected.workflow.completedAt }}</strong>
+              </div>
+            </div>
+            <div v-if="goalProgress(selected).total" class="drawer-progress">
+              <span :style="{ width: `${goalProgress(selected).percent}%` }" />
+            </div>
+          </section>
+
+          <section v-if="selectedGoals.length" class="drawer-section">
+            <h2>Goals <span>{{ selectedGoals.length }}</span></h2>
+            <div class="goal-list">
+              <div v-for="goal in selectedGoals" :key="goal.id" class="goal-row" :class="`goal-${goal.status}`">
+                <span class="goal-check"><Check v-if="goal.status === 'achieved'" :size="12" /></span>
+                <span><strong>{{ goal.text }}</strong><small>{{ goal.stage || 'Overall' }}</small></span>
+              </div>
+            </div>
+          </section>
+
+          <section v-if="Object.keys(selectedProperties).length" class="drawer-section">
             <h2>Properties</h2>
             <dl class="properties">
-              <template v-for="(value, key) in selected.properties" :key="key">
+              <template v-for="(value, key) in selectedProperties" :key="key">
                 <dt>{{ key }}</dt><dd>{{ formatProperty(value) }}</dd>
               </template>
             </dl>

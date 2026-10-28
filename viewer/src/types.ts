@@ -7,6 +7,23 @@ export interface ViewerNode {
   properties: Record<string, unknown>
   incomingCount: number
   outgoingCount: number
+  workflow?: ViewerWorkflow
+}
+
+export interface ViewerGoal {
+  id: string
+  text: string
+  status: string
+  scope?: string
+  stage?: string | null
+}
+
+export interface ViewerWorkflow {
+  status?: string
+  stage?: string | null
+  completedAt?: string | null
+  milestone?: boolean
+  goals: ViewerGoal[]
 }
 
 export interface LayoutNode extends ViewerNode, SimulationNodeDatum {
