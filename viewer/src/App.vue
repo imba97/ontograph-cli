@@ -20,6 +20,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import GraphControls from './components/GraphControls.vue'
 import GraphFilters from './components/GraphFilters.vue'
 import TaskOverview from './components/TaskOverview.vue'
+import { buildGraphIndex, emptyProgress, isCompletedNode } from './graph-index'
 import { wheelZoomFactor } from './zoom'
 
 interface Point { x: number, y: number }
@@ -50,7 +51,8 @@ let simulation: Simulation<LayoutNode, LayoutLink> | null = null
 let panStart: Point | null = null
 let dragNode: LayoutNode | null = null
 
-const nodeById = computed(() => new Map(nodes.value.map(node => [node.id, node])))
+const graphIndex = computed(() => buildGraphIndex(nodes.value, graph.value?.edges ?? []))
+const nodeById = computed(() => graphIndex.value.nodeById)
 const selected = computed(() => selectedId.value ? nodeById.value.get(selectedId.value) ?? null : null)
 const workflowNodes = computed(() => nodes.value.filter(node => node.workflow))
 const taskNodes = computed(() => workflowNodes.value.filter(isTaskNode))
@@ -103,8 +105,8 @@ const neighborIds = computed(() => {
     ids.add(edge.source === selectedId.value ? edge.target : edge.source)
   return ids
 })
-const incoming = computed(() => graph.value?.edges.filter(edge => edge.target === selectedId.value) ?? [])
-const outgoing = computed(() => graph.value?.edges.filter(edge => edge.source === selectedId.value) ?? [])
+const incoming = computed(() => graphIndex.value.incomingByNodeId.get(selectedId.value) ?? [])
+const outgoing = computed(() => graphIndex.value.outgoingByNodeId.get(selectedId.value) ?? [])
 const selectedProperties = computed(() => {
   if (!selected.value?.workflow)
     return selected.value?.properties ?? {}
@@ -122,17 +124,9 @@ const selectedGoals = computed(() => {
   })
 })
 const selectedChildren = computed(() => {
-  if (!selectedId.value)
-    return []
-  const childIds = new Set((graph.value?.edges ?? [])
-    .filter(edge => edge.relation === 'child_of' && edge.target === selectedId.value)
-    .map(edge => edge.source))
-  return nodes.value.filter(node => childIds.has(node.id))
+  return graphIndex.value.childrenByParentId.get(selectedId.value) ?? []
 })
-const selectedChildProgress = computed(() => {
-  const completed = selectedChildren.value.filter(node => isCompleted(node)).length
-  return { completed, total: selectedChildren.value.length }
-})
+const selectedChildProgress = computed(() => graphIndex.value.childProgressByNodeId.get(selectedId.value) ?? emptyProgress())
 const selectedHistory = computed(() => [...(selected.value?.workflow?.history ?? [])].sort((left, right) => right.at.localeCompare(left.at)))
 const selectedStages = computed<StageSummary[]>(() => {
   const workflow = selected.value?.workflow
@@ -198,15 +192,11 @@ function isTaskNode(node: ViewerNode): boolean {
 }
 
 function isCompleted(node: ViewerNode): boolean {
-  return ['done', 'completed', 'closed'].includes(node.workflow?.status?.toLocaleLowerCase() ?? '')
+  return isCompletedNode(node)
 }
 
-function goalProgress(node: ViewerNode): { achieved: number, total: number, percent: number, cancelled: number } {
-  const goals = node.workflow?.goals ?? []
-  const achieved = goals.filter(goal => goal.status === 'achieved').length
-  const cancelled = goals.filter(goal => goal.status === 'cancelled').length
-  const total = goals.length - cancelled
-  return { achieved, total, percent: total ? achieved / total * 100 : 0, cancelled }
+function goalProgress(node: ViewerNode) {
+  return graphIndex.value.goalProgressByNodeId.get(node.id) ?? emptyProgress()
 }
 
 function resetFilters(): void {
@@ -241,13 +231,8 @@ function toggleOverview(): void {
     clearSelection()
 }
 
-function childProgress(node: ViewerNode): { completed: number, total: number, percent: number } {
-  const childIds = (graph.value?.edges ?? [])
-    .filter(edge => edge.relation === 'child_of' && edge.target === node.id)
-    .map(edge => edge.source)
-  const children = childIds.flatMap(id => nodeById.value.get(id) ?? [])
-  const completed = children.filter(child => isCompleted(child)).length
-  return { completed, total: children.length, percent: children.length ? completed / children.length * 100 : 0 }
+function childProgress(node: ViewerNode) {
+  return graphIndex.value.childProgressByNodeId.get(node.id) ?? emptyProgress()
 }
 
 function formatDateTime(value?: string): string {
