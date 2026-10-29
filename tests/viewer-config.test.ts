@@ -29,6 +29,9 @@ describe('viewer config', () => {
 version: 1
 viewer:
   title: Issues
+entities:
+  knowledge:
+    defaultVisible: false
 workflows:
   issue:
     entityTypes: [issue]
@@ -39,6 +42,7 @@ workflows:
         label: Resolved
         color: "#22a06b"
         completed: true
+        defaultVisible: false
 relations:
   "role_*":
     label: Role
@@ -48,6 +52,8 @@ relations:
     const config = loadViewerConfig(directory)
     expect(config.workflows.issue?.fields.status).toBe('state')
     expect(config.workflows.issue?.statuses.resolved?.completed).toBe(true)
+    expect(config.workflows.issue?.statuses.resolved?.defaultVisible).toBe(false)
+    expect(config.entities.knowledge?.defaultVisible).toBe(false)
     expect(matchConfiguredRule(config.relations, 'role_owner')).toMatchObject({ label: 'Role', defaultVisible: false })
   })
 

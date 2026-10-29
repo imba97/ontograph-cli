@@ -19,7 +19,7 @@ const workflowConfig: ViewerConfig = {
       entityTypes: ['todo'],
       fields: { status: 'status', stage: 'stage', goals: 'goals', history: 'history', milestones: 'milestoneStepIds', completedAt: 'completedAt' },
       hierarchy: { relation: 'child_of', direction: 'child-to-parent' },
-      statuses: { 'in-progress': { label: 'In progress', color: '#6750d8', completed: false } }
+      statuses: { 'in-progress': { label: 'In progress', color: '#6750d8', completed: false, defaultVisible: true } }
     }
   },
   drawer: { tabs: [{ id: 'overview', label: 'Overview', when: 'always', components: [{ type: 'property-list' }] }] }

@@ -7,6 +7,7 @@ export interface ViewerConfig {
     label?: string
     color?: string
     icon?: 'circle-check' | 'book-open' | 'user' | 'folder-tree' | 'tag'
+    defaultVisible: boolean
     card?: { subtitle?: { field: string, prefix?: string, truncate?: number } }
   }>
   relations: Record<string, {
@@ -20,7 +21,7 @@ export interface ViewerConfig {
     entityTypes: string[]
     fields: Record<string, string | undefined>
     hierarchy?: { relation: string, direction: 'child-to-parent' | 'parent-to-child' }
-    statuses: Record<string, { label: string, color: string, completed: boolean }>
+    statuses: Record<string, { label: string, color: string, completed: boolean, defaultVisible: boolean }>
   }>
   drawer: {
     tabs: Array<{

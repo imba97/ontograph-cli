@@ -217,11 +217,28 @@ function goalProgress(node: ViewerNode) {
 }
 
 function resetFilters(): void {
+  applyDefaultFilters()
+  hiddenStages.clear()
+  onlyMilestones.value = false
+}
+
+function applyDefaultFilters(): void {
   hiddenTypes.clear()
   hiddenRelations.clear()
   hiddenStatuses.clear()
-  hiddenStages.clear()
-  onlyMilestones.value = false
+  for (const type of graph.value?.entityTypes ?? []) {
+    if (viewerConfig.value?.entities[type]?.defaultVisible === false)
+      hiddenTypes.add(type)
+  }
+  for (const relation of graph.value?.relationTypes ?? []) {
+    if (relationConfig(relation)?.defaultVisible === false)
+      hiddenRelations.add(relation)
+  }
+  for (const status of workflowStatuses.value) {
+    const workflow = Object.values(viewerConfig.value?.workflows ?? {}).find(candidate => candidate.statuses[status])
+    if (workflow?.statuses[status]?.defaultVisible === false)
+      hiddenStatuses.add(status)
+  }
 }
 
 function isolateStatus(status: string): void {
@@ -380,13 +397,9 @@ async function loadGraph(): Promise<void> {
     document.title = `${viewerConfig.value.viewer.title} Inspector`
     if (!localStorage.getItem('ontograph-node-mode'))
       cardMode.value = viewerConfig.value.viewer.defaultNodeMode !== 'dot'
-    hiddenRelations.clear()
-    for (const relation of (payload as ViewerGraph).relationTypes) {
-      if (relationConfig(relation)?.defaultVisible === false)
-        hiddenRelations.add(relation)
-    }
     graph.value = payload as ViewerGraph
     rebuildLayout(graph.value)
+    applyDefaultFilters()
     await nextTick()
     if (loading.value) {
       fitGraph()

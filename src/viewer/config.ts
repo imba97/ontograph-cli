@@ -24,6 +24,7 @@ const viewerConfigSchema = z.object({
     label: z.string().min(1).optional(),
     color: z.string().regex(/^#[\da-f]{6}$/i).optional(),
     icon: z.enum(['circle-check', 'book-open', 'user', 'folder-tree', 'tag']).optional(),
+    defaultVisible: z.boolean().default(true),
     card: z.object({
       subtitle: z.object({
         field: fieldName,
@@ -56,7 +57,8 @@ const viewerConfigSchema = z.object({
     statuses: z.record(z.string(), z.object({
       label: z.string().min(1),
       color: z.string().regex(/^#[\da-f]{6}$/i),
-      completed: z.boolean()
+      completed: z.boolean(),
+      defaultVisible: z.boolean().default(true)
     })).default({})
   })).default({}),
   drawer: z.object({
